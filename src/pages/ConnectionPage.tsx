@@ -138,7 +138,7 @@ export function ConnectionPage() {
             className={inputClass}
             value={baseUrl}
             onChange={(e) => setBaseUrl(e.target.value)}
-            placeholder="http://127.0.0.1:8082"
+            placeholder="https://erp.zatgo.online"
             autoComplete="url"
             disabled={connected}
             required

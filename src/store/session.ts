@@ -26,7 +26,7 @@ type SessionState = {
 
 const defaultBaseUrl =
   (typeof import.meta !== "undefined" && import.meta.env?.VITE_FRAPPE_BASE_URL) ||
-  "http://127.0.0.1:8082";
+  "https://erp.zatgo.online";
 
 export const useSessionStore = create<SessionState>()(
   persist(

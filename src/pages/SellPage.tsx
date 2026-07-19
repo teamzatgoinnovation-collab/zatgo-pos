@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Button } from "@zatgo/ui";
+import { Button, FormDialog } from "@zatgo/ui";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { BarcodeScanField } from "@/components/pos/BarcodeScanField";
@@ -9,7 +9,6 @@ import { ConfirmDialog } from "@/components/pos/ConfirmDialog";
 import { DocumentPreviewDialog } from "@/components/pos/DocumentPreviewDialog";
 import { ExtraPickerDialog } from "@/components/pos/ExtraPickerDialog";
 import { FloorHubDialog } from "@/components/pos/FloorHubDialog";
-import { FormDialog } from "@/components/FormDialog";
 import { HeldHubDialog } from "@/components/pos/HeldHubDialog";
 import { HeldSalesBar } from "@/components/pos/HeldSalesBar";
 import { InvoiceCheckoutDialog } from "@/components/pos/InvoiceCheckoutDialog";

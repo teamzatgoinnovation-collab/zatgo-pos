@@ -4,6 +4,8 @@
 :root {
   --pos-sidebar: oklch(0.96 0.02 145);
   --pos-sidebar-active: oklch(0.91 0.04 145);
+  --app-sidebar: var(--pos-sidebar);
+  --app-sidebar-active: var(--pos-sidebar-active);
   --pos-floor-free: oklch(0.94 0.03 145);
   --pos-floor-occupied: oklch(0.93 0.06 55);
   --pos-floor-billing: oklch(0.93 0.05 250);
@@ -15,6 +17,8 @@
 .dark {
   --pos-sidebar: oklch(0.2 0.02 145);
   --pos-sidebar-active: oklch(0.26 0.03 145);
+  --app-sidebar: var(--pos-sidebar);
+  --app-sidebar-active: var(--pos-sidebar-active);
   --pos-floor-free: oklch(0.28 0.03 145);
   --pos-floor-occupied: oklch(0.3 0.05 55);
   --pos-floor-billing: oklch(0.28 0.04 250);

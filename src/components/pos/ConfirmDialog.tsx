@@ -1,5 +1,4 @@
-import { Button } from "@zatgo/ui";
-import { FormDialog } from "@/components/FormDialog";
+import { Button, FormDialog } from "@zatgo/ui";
 
 export function ConfirmDialog({
   open,

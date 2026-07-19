@@ -1,12 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Button, cn } from "@zatgo/ui";
+import { Button, cn, PageHeader, FormDialog } from "@zatgo/ui";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/pos/ConfirmDialog";
 import { TableDetailDialog } from "@/components/pos/TableDetailDialog";
-import { FormDialog } from "@/components/FormDialog";
-import { PageHeader } from "@/components/PageHeader";
 import {
   posRepo,
   type OrderRecord,

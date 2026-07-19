@@ -1,5 +1,4 @@
-import { Button, cn } from "@zatgo/ui";
-import { FormDialog } from "@/components/FormDialog";
+import { Button, cn, FormDialog } from "@zatgo/ui";
 import type { TableRecord, TableStatus } from "@/lib/pos-repo";
 
 const statusBg: Record<TableStatus, string> = {

@@ -1,9 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
-import { DataTable } from "@/components/DataTable";
-import { PageHeader } from "@/components/PageHeader";
 import { posRepo, type PaymentRecord } from "@/lib/pos-repo";
+import { PageHeader, DataTable } from "@zatgo/ui";
 
 export function ReportsPage() {
   const { data: payments = [] } = useQuery({

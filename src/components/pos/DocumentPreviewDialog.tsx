@@ -1,8 +1,7 @@
-import { Button } from "@zatgo/ui";
+import { Button, FormDialog } from "@zatgo/ui";
 import { FileText, Printer } from "@zatgo/icons";
 import { useState } from "react";
 import { toast } from "sonner";
-import { FormDialog } from "@/components/FormDialog";
 import { openCashDrawerIfNeeded, printPosDocument } from "@/lib/print";
 import type { DocumentKind, PosDocument } from "@/lib/pos-document";
 import { ReceiptDocument } from "./ReceiptDocument";

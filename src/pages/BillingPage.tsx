@@ -1,11 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Button } from "@zatgo/ui";
+import { Button, PageHeader, DataTable } from "@zatgo/ui";
 import { FileText, Printer } from "@zatgo/icons";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import type { ColumnDef } from "@tanstack/react-table";
-import { DataTable } from "@/components/DataTable";
-import { PageHeader } from "@/components/PageHeader";
 import { DocumentPreviewDialog } from "@/components/pos/DocumentPreviewDialog";
 import { posRepo, type OrderRecord, type PaymentRecord } from "@/lib/pos-repo";
 import { openCashDrawerIfNeeded, printPosDocument } from "@/lib/print";

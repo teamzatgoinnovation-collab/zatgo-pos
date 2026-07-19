@@ -1,6 +1,5 @@
-import { Button } from "@zatgo/ui";
+import { Button, FormDialog } from "@zatgo/ui";
 import { Play, X } from "@zatgo/icons";
-import { FormDialog } from "@/components/FormDialog";
 import { cartItemCount, cartPricing, type HeldSale } from "@/store/cart";
 import { formatExtras } from "@/lib/extras";
 

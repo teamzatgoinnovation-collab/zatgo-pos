@@ -1,6 +1,5 @@
-import { Button } from "@zatgo/ui";
+import { Button, FormDialog } from "@zatgo/ui";
 import { FileText, Printer } from "@zatgo/icons";
-import { FormDialog } from "@/components/FormDialog";
 import type { PaymentRecord } from "@/lib/pos-repo";
 
 export function InvoicesHubDialog({

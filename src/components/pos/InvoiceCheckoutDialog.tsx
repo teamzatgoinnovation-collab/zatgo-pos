@@ -1,8 +1,7 @@
-import { Button, cn } from "@zatgo/ui";
+import { Button, cn, FormDialog } from "@zatgo/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { FormDialog } from "@/components/FormDialog";
 import type { CustomerRecord, DeliveryBoyRecord, TableRecord } from "@/lib/pos-repo";
 import { posRepo } from "@/lib/pos-repo";
 import {

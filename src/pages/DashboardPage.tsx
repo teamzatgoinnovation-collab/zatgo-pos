@@ -1,10 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { PageHeader } from "@/components/PageHeader";
 import { posRepo } from "@/lib/pos-repo";
 import { effectiveHasFeature } from "@/lib/modules";
 import type { PosFeature } from "@/lib/verticals";
 import { useBusinessStore } from "@/store/business";
+import { PageHeader } from "@zatgo/ui";
 
 type Card = {
   key: string;

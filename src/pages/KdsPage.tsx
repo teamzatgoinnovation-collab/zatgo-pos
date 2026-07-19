@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Button, cn } from "@zatgo/ui";
+import { Button, cn, PageHeader } from "@zatgo/ui";
 import { useState } from "react";
 import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/pos/ConfirmDialog";
@@ -7,7 +7,6 @@ import { DocumentPreviewDialog } from "@/components/pos/DocumentPreviewDialog";
 import { KdsTicketDialog } from "@/components/pos/KdsTicketDialog";
 import { OrderDetailDialog } from "@/components/pos/OrderDetailDialog";
 import { SendKitchenDialog } from "@/components/pos/SendKitchenDialog";
-import { PageHeader } from "@/components/PageHeader";
 import {
   posRepo,
   type KitchenStation,

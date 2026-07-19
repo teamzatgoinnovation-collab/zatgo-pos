@@ -1,8 +1,7 @@
-import { Button, cn } from "@zatgo/ui";
+import { Button, cn, PageHeader } from "@zatgo/ui";
 import { Loader2 } from "@zatgo/icons";
 import { useState } from "react";
 import { toast } from "sonner";
-import { PageHeader } from "@/components/PageHeader";
 import { FeaturePreferences } from "@/components/pos/FeaturePreferences";
 import { PrinterSettings } from "@/components/pos/PrinterSettings";
 import {

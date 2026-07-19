@@ -1,6 +1,5 @@
-import { Button } from "@zatgo/ui";
+import { Button, FormDialog } from "@zatgo/ui";
 import { CookingPot } from "@zatgo/icons";
-import { FormDialog } from "@/components/FormDialog";
 import type { OrderRecord } from "@/lib/pos-repo";
 import { formatExtras } from "@/lib/extras";
 

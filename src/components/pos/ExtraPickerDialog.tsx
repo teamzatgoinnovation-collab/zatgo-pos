@@ -1,6 +1,5 @@
-import { Button, cn } from "@zatgo/ui";
+import { Button, cn, FormDialog } from "@zatgo/ui";
 import { useEffect, useState } from "react";
-import { FormDialog } from "@/components/FormDialog";
 import type { ProductExtra, ProductRecord, SelectedExtra } from "@/lib/pos-repo";
 import { extrasTotal, lineUnitPrice } from "@/lib/extras";
 

@@ -1,15 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Button } from "@zatgo/ui";
+import { Button, PageHeader, DataTable, FormDialog, SearchField } from "@zatgo/ui";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 import type { ColumnDef } from "@tanstack/react-table";
-import { DataTable } from "@/components/DataTable";
-import { FormDialog } from "@/components/FormDialog";
-import { PageHeader } from "@/components/PageHeader";
-import { SearchField } from "@/components/SearchField";
 import { posRepo, type DeliveryBoyRecord } from "@/lib/pos-repo";
 
 const schema = z.object({

@@ -1,6 +1,5 @@
-import { Button, cn } from "@zatgo/ui";
+import { Button, cn, FormDialog } from "@zatgo/ui";
 import { ClipboardList, Receipt, Users } from "@zatgo/icons";
-import { FormDialog } from "@/components/FormDialog";
 import type { OrderRecord, TableRecord } from "@/lib/pos-repo";
 import { formatExtras } from "@/lib/extras";
 

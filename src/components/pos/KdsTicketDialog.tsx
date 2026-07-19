@@ -1,6 +1,5 @@
-import { Button, cn } from "@zatgo/ui";
+import { Button, cn, FormDialog } from "@zatgo/ui";
 import { Printer, RotateCcw } from "@zatgo/icons";
-import { FormDialog } from "@/components/FormDialog";
 import type { KdsTicket } from "@/lib/pos-repo";
 import { formatExtras } from "@/lib/extras";
 

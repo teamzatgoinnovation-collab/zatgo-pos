@@ -42,7 +42,7 @@ pnpm --filter @zatgo/pos dev
 | `build` | Typecheck + production build |
 | `typecheck` | Renderer + electron `tsc` |
 
-Use **Setup** or the login screen to sign in with ERPNext email/password (Electron session via `@zatgo/erpnext`). Default site URL is `https://erp.zatgo.online`.
+Use **Setup** or the login screen to sign in with ERPNext email/password (Electron session via `@zatgo/erpnext`). Default site URL is `https://demo.zatgo.online`.
 
 **Live via `@zatgo/erpnext` + `zatgo_core` (no local mock seed):** catalog, KDS, delivery boys (`ZG Delivery Boy` + ERPNext User role **Delivery** with username/password), assign boy on delivery checkout, delivery stop create (`ZG Delivery Stop`) on charge.
 

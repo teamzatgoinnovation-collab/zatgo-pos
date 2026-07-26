@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "@zatgo/ui/globals.css";
+@source "../../../../packages/ui/src";
 
 :root {
   --pos-sidebar: oklch(0.96 0.02 145);

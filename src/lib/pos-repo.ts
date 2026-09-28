@@ -1,15 +1,19 @@
 import { ZatGoApi } from "@zatgo/erpnext";
 import type { VerticalId } from "@/lib/verticals";
 import { callZatGoApi } from "@/lib/call-zatgo-api";
+import { clearClientId, getOrCreateClientId } from "@/lib/idempotency";
 import type {
   CheckoutMeta,
   CustomerRecord,
+  DeliveryInfo,
   DeliveryBoyRecord,
   InventoryRecord,
   KdsTicket,
   KitchenStation,
+  OrderChannel,
   OrderItem,
   OrderRecord,
+  OrderStatus,
   PaymentRecord,
   ProductRecord,
   SelectedExtra,
@@ -17,7 +21,6 @@ import type {
   TableStatus,
 } from "@/lib/pos-models";
 import type { PaymentMethod } from "@/store/cart";
-import { lineUnitPrice } from "@/lib/extras";
 
 export type * from "@/lib/pos-models";
 
@@ -125,6 +128,111 @@ function mapDeliveryBoy(row: Record<string, unknown>): DeliveryBoyRecord {
   };
 }
 
+const ORDER_STATUSES: OrderStatus[] = ["open", "sent", "ready", "paid", "void"];
+
+function parseOrderStatus(value: unknown): OrderStatus {
+  const s = String(value ?? "open").toLowerCase();
+  return (ORDER_STATUSES.includes(s as OrderStatus) ? s : "open") as OrderStatus;
+}
+
+const ORDER_CHANNELS: OrderChannel[] = ["dine_in", "counter", "walk_in", "delivery"];
+
+function parseOrderChannel(value: unknown): OrderChannel {
+  const s = String(value ?? "counter").toLowerCase();
+  return (ORDER_CHANNELS.includes(s as OrderChannel) ? s : "counter") as OrderChannel;
+}
+
+const TABLE_STATUSES: TableStatus[] = ["free", "occupied", "billing"];
+
+function parseTableStatus(value: unknown): TableStatus {
+  const s = String(value ?? "free").toLowerCase();
+  return (TABLE_STATUSES.includes(s as TableStatus) ? s : "free") as TableStatus;
+}
+
+function mapOrderItem(row: Record<string, unknown>): OrderItem {
+  const extrasRaw = row.extras;
+  const extras: SelectedExtra[] = Array.isArray(extrasRaw)
+    ? extrasRaw
+        .filter((e): e is Record<string, unknown> => Boolean(e && typeof e === "object"))
+        .map((e) => ({
+          id: String(e.id ?? e.name ?? ""),
+          name: String(e.name ?? e.id ?? ""),
+          price: Number(e.price ?? 0),
+        }))
+    : [];
+  return {
+    id: String(row.id ?? row.name ?? ""),
+    name: String(row.name ?? row.item_name ?? "Item"),
+    qty: Number(row.qty ?? 1) || 1,
+    price: Number(row.price ?? row.rate ?? 0),
+    station: parseStation(row.station),
+    status: parseTicketStatus(row.status),
+    extras: extras.length ? extras : undefined,
+  };
+}
+
+function mapDelivery(row: unknown): DeliveryInfo | null {
+  if (!row || typeof row !== "object") return null;
+  const r = row as Record<string, unknown>;
+  return {
+    address: String(r.address ?? ""),
+    phone: String(r.phone ?? ""),
+    notes: r.notes ? String(r.notes) : undefined,
+    deliveryBoyId: (r.deliveryBoyId ?? r.delivery_boy_id ?? null) as string | null,
+    deliveryBoyName: (r.deliveryBoyName ?? r.delivery_boy_name ?? null) as string | null,
+  };
+}
+
+function mapOrder(row: Record<string, unknown>): OrderRecord {
+  return {
+    id: String(row.id ?? row.name ?? ""),
+    number: String(row.number ?? row.order_number ?? ""),
+    tableId: (row.tableId ?? row.table_id ?? row.table ?? null) as string | null,
+    tableName: String(row.tableName ?? row.table_name ?? ""),
+    covers: Number(row.covers ?? 1) || 1,
+    status: parseOrderStatus(row.status),
+    items: Array.isArray(row.items)
+      ? (row.items as Record<string, unknown>[]).map(mapOrderItem)
+      : [],
+    openedAt: String(row.openedAt ?? row.opened_at ?? ""),
+    server: String(row.server ?? ""),
+    channel: parseOrderChannel(row.channel),
+    note: row.note ? String(row.note) : undefined,
+    customerId: (row.customerId ?? row.customer_id ?? row.customer ?? null) as string | null,
+    customerName: (row.customerName ?? row.customer_name ?? null) as string | null,
+    customerPhone: (row.customerPhone ?? row.customer_phone ?? null) as string | null,
+    delivery: mapDelivery(row.delivery),
+    deliveryStatus: (row.deliveryStatus ?? row.delivery_status ?? null) as
+      | OrderRecord["deliveryStatus"]
+      | null,
+  };
+}
+
+function mapTable(row: Record<string, unknown>): TableRecord {
+  return {
+    id: String(row.id ?? row.table_code ?? row.name ?? ""),
+    name: String(row.name ?? row.table_name ?? ""),
+    seats: Number(row.seats ?? 0) || 0,
+    zone: String(row.zone ?? ""),
+    status: parseTableStatus(row.status),
+    orderId: (row.orderId ?? row.order_id ?? row.current_order ?? null) as string | null,
+    covers: Number(row.covers ?? 0) || 0,
+  };
+}
+
+function mapPayment(row: Record<string, unknown>): PaymentRecord {
+  const method = String(row.method ?? "cash").toLowerCase();
+  return {
+    id: String(row.id ?? ""),
+    orderId: String(row.orderId ?? row.order_id ?? ""),
+    orderNumber: String(row.orderNumber ?? row.order_number ?? ""),
+    method: (method === "card" || method === "wallet" ? method : "cash") as PaymentMethod,
+    amount: Number(row.amount ?? 0),
+    paidAt: String(row.paidAt ?? row.paid_at ?? ""),
+    channel: parseOrderChannel(row.channel),
+  };
+}
+
 function boyStatusRank(status?: string): number {
   const s = (status || "").toLowerCase();
   if (s === "available") return 0;
@@ -135,11 +243,6 @@ function boyStatusRank(status?: string): number {
 
 function notReady<T>(): Promise<T> {
   return Promise.reject(new Error(NOT_READY));
-}
-
-function nextOrderNumber() {
-  const stamp = Date.now().toString(36).toUpperCase().slice(-5);
-  return `POS-${stamp}`;
 }
 
 export type PosCounts = {
@@ -202,15 +305,26 @@ export const posRepo = {
   },
 
   async listOrders(): Promise<OrderRecord[]> {
-    return [];
+    const env = await callZatGoApi<unknown[]>(ZatGoApi.restoPos.ordersList, {
+      page: 1,
+      page_size: 100,
+    });
+    return asRows(env.data).map(mapOrder).filter((o) => o.id);
   },
 
-  async getOrder(_id: string): Promise<OrderRecord> {
-    return notReady();
+  async getOrder(id: string): Promise<OrderRecord> {
+    const env = await callZatGoApi<Record<string, unknown>>(ZatGoApi.restoPos.ordersGet, {
+      name: id,
+    });
+    return mapOrder(env.data ?? {});
   },
 
   async listTables(): Promise<TableRecord[]> {
-    return [];
+    const env = await callZatGoApi<unknown[]>(ZatGoApi.restoPos.tablesList, {
+      page: 1,
+      page_size: 100,
+    });
+    return asRows(env.data).map(mapTable).filter((t) => t.id);
   },
 
   async listCustomers(): Promise<CustomerRecord[]> {
@@ -321,20 +435,34 @@ export const posRepo = {
     return notReady();
   },
 
-  async sendOrder(_orderId: string): Promise<OrderRecord> {
-    return notReady();
+  async sendOrder(orderId: string): Promise<OrderRecord> {
+    const env = await callZatGoApi<Record<string, unknown>>(ZatGoApi.restoPos.ordersSend, {
+      order_id: orderId,
+    });
+    return mapOrder(env.data ?? {});
   },
 
-  async voidOrder(_orderId: string): Promise<OrderRecord> {
-    return notReady();
+  async voidOrder(orderId: string): Promise<OrderRecord> {
+    const env = await callZatGoApi<Record<string, unknown>>(ZatGoApi.restoPos.ordersVoid, {
+      order_id: orderId,
+    });
+    return mapOrder(env.data ?? {});
   },
 
-  async setOrderNote(_orderId: string, _note: string): Promise<OrderRecord> {
-    return notReady();
+  async setOrderNote(orderId: string, note: string): Promise<OrderRecord> {
+    const env = await callZatGoApi<Record<string, unknown>>(ZatGoApi.restoPos.ordersSetNote, {
+      order_id: orderId,
+      note,
+    });
+    return mapOrder(env.data ?? {});
   },
 
-  async giveToDelivery(_orderId: string): Promise<OrderRecord> {
-    return notReady();
+  async giveToDelivery(orderId: string): Promise<OrderRecord> {
+    const env = await callZatGoApi<Record<string, unknown>>(
+      ZatGoApi.restoPos.ordersGiveToDelivery,
+      { order_id: orderId },
+    );
+    return mapOrder(env.data ?? {});
   },
 
   async advanceKdsItem(itemId: string): Promise<KdsTicket> {
@@ -361,47 +489,103 @@ export const posRepo = {
     return { count: Number(env.data?.count ?? 0) };
   },
 
-  async seatTable(_tableId: string, _covers: number): Promise<OrderRecord> {
-    return notReady();
+  async seatTable(tableId: string, covers: number): Promise<OrderRecord> {
+    const env = await callZatGoApi<Record<string, unknown>>(ZatGoApi.restoPos.tablesSeat, {
+      table_id: tableId,
+      covers,
+      client_id: crypto.randomUUID(),
+    });
+    return mapOrder(env.data ?? {});
   },
 
-  async setTableStatus(_tableId: string, _status: TableStatus): Promise<TableRecord> {
-    return notReady();
+  async setTableStatus(tableId: string, status: TableStatus): Promise<TableRecord> {
+    const env = await callZatGoApi<Record<string, unknown>>(ZatGoApi.restoPos.tablesSetStatus, {
+      table_id: tableId,
+      status,
+    });
+    return mapTable(env.data ?? {});
   },
 
-  async markBilling(_orderId: string): Promise<OrderRecord> {
-    return notReady();
+  async markBilling(orderId: string): Promise<OrderRecord> {
+    const env = await callZatGoApi<Record<string, unknown>>(
+      ZatGoApi.restoPos.billingMarkBilling,
+      { order_id: orderId },
+    );
+    return mapOrder(env.data ?? {});
   },
 
   async payOrder(
-    _orderId: string,
-    _method: PaymentRecord["method"],
+    orderId: string,
+    method: PaymentRecord["method"],
   ): Promise<{ payment: PaymentRecord; order: OrderRecord }> {
-    return notReady();
+    const key = `pay:${orderId}`;
+    const clientId = getOrCreateClientId(key);
+    const env = await callZatGoApi<{ order: Record<string, unknown>; payment: Record<string, unknown> }>(
+      ZatGoApi.restoPos.billingPay,
+      { order_id: orderId, method, client_id: clientId },
+    );
+    clearClientId(key);
+    const data = env.data ?? { order: {}, payment: {} };
+    return { order: mapOrder(data.order ?? {}), payment: mapPayment(data.payment ?? {}) };
   },
 
   async addItemToOrder(
-    _orderId: string,
-    _menuItemId: string,
-    _qty: number,
-    _extras?: SelectedExtra[],
+    orderId: string,
+    menuItemId: string,
+    qty: number,
+    extras?: SelectedExtra[],
   ): Promise<OrderRecord> {
-    return notReady();
+    const env = await callZatGoApi<Record<string, unknown>>(ZatGoApi.restoPos.ordersAddItem, {
+      order_id: orderId,
+      item_code: menuItemId,
+      qty,
+      extras,
+    });
+    return mapOrder(env.data ?? {});
   },
 
   async updateOrderItemQty(
-    _orderId: string,
-    _itemId: string,
-    _qty: number,
+    orderId: string,
+    itemId: string,
+    qty: number,
   ): Promise<OrderRecord> {
-    return notReady();
+    const env = await callZatGoApi<Record<string, unknown>>(
+      ZatGoApi.restoPos.ordersUpdateItemQty,
+      { order_id: orderId, item_row: itemId, qty },
+    );
+    return mapOrder(env.data ?? {});
   },
 
   async createOrderFromCart(
-    _meta: CheckoutMeta,
-    _items: unknown[],
+    meta: CheckoutMeta,
+    items: {
+      productId: string;
+      name?: string;
+      price?: number;
+      station?: KitchenStation;
+      qty: number;
+      extras: SelectedExtra[];
+    }[],
   ): Promise<OrderRecord> {
-    return notReady();
+    const env = await callZatGoApi<Record<string, unknown>>(ZatGoApi.restoPos.ordersCreate, {
+      table: meta.tableId ?? undefined,
+      covers: meta.covers ?? 1,
+      channel: meta.channel,
+      items: items.map((l) => ({
+        item_code: l.productId,
+        item_name: l.name,
+        qty: l.qty,
+        rate: l.price ?? 0,
+        station: l.station,
+        extras: l.extras,
+      })),
+      customer_id: meta.customerId ?? undefined,
+      customer_name: meta.customerName ?? undefined,
+      customer_phone: meta.customerPhone ?? undefined,
+      delivery: meta.delivery ?? undefined,
+      client_id: crypto.randomUUID(),
+    });
+    return mapOrder(env.data ?? {});
   },
 
   async checkoutWalkIn(
@@ -415,92 +599,50 @@ export const posRepo = {
     }[],
     method: PaymentMethod,
     _verticalId: VerticalId,
-    pricing: { amount: number; discount: number; tax: number },
+    _pricing: { amount: number; discount: number; tax: number },
     meta: CheckoutMeta,
   ): Promise<{ order: OrderRecord; payment: PaymentRecord }> {
     if (!lines.length) {
       return Promise.reject(new Error("Cart is empty"));
     }
-
-    const orderNumber = nextOrderNumber();
-    const orderId = `ord_${Date.now().toString(36)}`;
-    const paidAt = new Date().toISOString();
     const isDelivery = meta.channel === "delivery";
-
-    const order: OrderRecord = {
-      id: orderId,
-      number: orderNumber,
-      tableId: meta.tableId ?? null,
-      tableName: meta.tableName ?? "",
-      covers: meta.covers ?? 1,
-      status: "paid",
-      items: lines.map((l, idx) => ({
-        id: `oi_${idx}_${l.productId}`,
-        name: l.name || l.productId,
-        qty: l.qty,
-        price:
-          l.price ??
-          lineUnitPrice(0, l.extras),
-        station: l.station || "counter",
-        status: "served",
-        extras: l.extras,
-      })),
-      openedAt: paidAt,
-      server: "POS",
-      channel: meta.channel,
-      customerId: meta.customerId,
-      customerName: meta.customerName,
-      customerPhone: meta.customerPhone,
-      delivery: meta.delivery ?? null,
-      deliveryStatus: isDelivery ? "handed_off" : null,
-    };
-
-    const payment: PaymentRecord = {
-      id: `pay_${Date.now().toString(36)}`,
-      orderId,
-      orderNumber,
-      method,
-      amount: pricing.amount,
-      paidAt,
-      channel: meta.channel,
-    };
-
-    if (isDelivery) {
-      const boyId = meta.delivery?.deliveryBoyId?.trim();
-      if (!boyId) {
-        return Promise.reject(new Error("Assign a delivery boy"));
-      }
-      const itemsSummary = order.items
-        .map((i) => `${i.qty}× ${i.name}`)
-        .join(", ")
-        .slice(0, 140);
-      const notes = meta.delivery?.notes?.trim();
-      await callZatGoApi(ZatGoApi.delivery.stopsCreate, {
-        title: `POS ${orderNumber}`,
-        order_number: orderNumber,
-        invoice_number: orderNumber,
-        customer: meta.customerName || "Walk-in",
-        address: meta.delivery?.address || "",
-        phone: meta.delivery?.phone || meta.customerPhone || "",
-        window_label: "ASAP",
-        items_summary: notes ? `${itemsSummary} · ${notes}` : itemsSummary,
-        delivery_boy: boyId,
-        status: "Assigned",
-        remarks: notes || undefined,
-        payment_method:
-          method === "cash"
-            ? "COD"
-            : method === "card"
-              ? "Card"
-              : method === "wallet"
-                ? "Wallet"
-                : undefined,
-        cod_amount: method === "cash" ? pricing.amount : 0,
-        paid_amount: method === "cash" ? 0 : pricing.amount,
-        delivery_charges: 0,
-      });
+    if (isDelivery && !meta.delivery?.deliveryBoyId?.trim()) {
+      return Promise.reject(new Error("Assign a delivery boy"));
     }
 
+    const clientId = getOrCreateClientId("active_sale");
+    const createEnv = await callZatGoApi<Record<string, unknown>>(ZatGoApi.restoPos.ordersCreate, {
+      table: meta.tableId ?? undefined,
+      covers: meta.covers ?? 1,
+      channel: meta.channel,
+      items: lines.map((l) => ({
+        item_code: l.productId,
+        item_name: l.name,
+        qty: l.qty,
+        rate: l.price ?? 0,
+        station: l.station,
+        extras: l.extras,
+      })),
+      customer_id: meta.customerId ?? undefined,
+      customer_name: meta.customerName ?? undefined,
+      customer_phone: meta.customerPhone ?? undefined,
+      delivery: meta.delivery ?? undefined,
+      client_id: clientId,
+    });
+    const orderId = String(createEnv.data?.id ?? "");
+
+    const payEnv = await callZatGoApi<{ order: Record<string, unknown>; payment: Record<string, unknown> }>(
+      ZatGoApi.restoPos.billingPay,
+      { order_id: orderId, method, client_id: clientId },
+    );
+    let order = mapOrder(payEnv.data?.order ?? {});
+    const payment = mapPayment(payEnv.data?.payment ?? {});
+
+    if (isDelivery) {
+      order = await this.giveToDelivery(orderId);
+    }
+
+    clearClientId("active_sale");
     return { order, payment };
   },
 };

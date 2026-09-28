@@ -1,4 +1,4 @@
-import { Button, cn } from "@zatgo/ui";
+import { cn } from "@zatgo/ui";
 import { MapPin, Table2, Truck, User } from "@zatgo/icons";
 import type { CartInvoiceMeta, SaleType } from "@/store/cart";
 
@@ -85,9 +85,9 @@ export function InvoiceMetaPanel({
             {summary}
           </span>
         </span>
-        <Button variant="ghost" className="ml-auto h-7 shrink-0 px-2 text-xs" tabIndex={-1}>
+        <span className="ml-auto flex h-7 shrink-0 items-center px-2 text-xs font-medium text-[var(--color-muted-foreground)]">
           Edit
-        </Button>
+        </span>
       </button>
     </div>
   );

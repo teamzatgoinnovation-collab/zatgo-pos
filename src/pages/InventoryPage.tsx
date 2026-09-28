@@ -70,6 +70,7 @@ export function InventoryPage() {
       setOpen(false);
       setEditing(null);
     },
+    onError: (e: Error) => toast.error(e.message),
   });
 
   const columns = useMemo<ColumnDef<InventoryRecord>[]>(

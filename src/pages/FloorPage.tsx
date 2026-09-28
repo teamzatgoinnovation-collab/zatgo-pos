@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { Button, cn, PageHeader, FormDialog } from "@zatgo/ui";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -11,6 +11,7 @@ import {
   type TableRecord,
   type TableStatus,
 } from "@/lib/pos-repo";
+import { usePosTableActions } from "@/hooks/usePosActions";
 
 const statusBg: Record<TableStatus, string> = {
   free: "bg-[var(--pos-floor-free)]",
@@ -19,7 +20,6 @@ const statusBg: Record<TableStatus, string> = {
 };
 
 export function FloorPage() {
-  const qc = useQueryClient();
   const navigate = useNavigate();
   const [seatTable, setSeatTable] = useState<TableRecord | null>(null);
   const [detailTable, setDetailTable] = useState<TableRecord | null>(null);
@@ -31,8 +31,6 @@ export function FloorPage() {
     queryKey: ["pos", "tables"],
     queryFn: () => posRepo.listTables(),
   });
-
-  const invalidate = () => void qc.invalidateQueries({ queryKey: ["pos"] });
 
   const openTableDetail = async (table: TableRecord) => {
     setDetailTable(table);
@@ -48,46 +46,7 @@ export function FloorPage() {
     }
   };
 
-  const seat = useMutation({
-    mutationFn: async () => {
-      if (!seatTable) throw new Error("No table");
-      return posRepo.seatTable(seatTable.id, covers);
-    },
-    onSuccess: (order) => {
-      invalidate();
-      toast.success(`Seated ${seatTable?.name}`);
-      setSeatTable(null);
-      setDetailTable(null);
-      navigate("/orders");
-      void order;
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  const clear = useMutation({
-    mutationFn: (tableId: string) => posRepo.setTableStatus(tableId, "free"),
-    onSuccess: () => {
-      invalidate();
-      setClearTable(null);
-      setDetailTable(null);
-      setDetailOrder(null);
-      toast.success("Table cleared");
-    },
-  });
-
-  const requestBill = useMutation({
-    mutationFn: (orderId: string) => posRepo.markBilling(orderId),
-    onSuccess: async () => {
-      invalidate();
-      toast.success("Table marked for billing");
-      if (detailTable) {
-        const tables = await posRepo.listTables();
-        const fresh = tables.find((t) => t.id === detailTable.id);
-        if (fresh) await openTableDetail(fresh);
-      }
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
+  const { seat, clearTable: clear, requestBill } = usePosTableActions();
 
   const zones = [...new Set(data.map((t) => t.zone))];
 
@@ -165,7 +124,17 @@ export function FloorPage() {
         onOpenOrders={() => {
           navigate("/orders");
         }}
-        onRequestBill={() => detailOrder && requestBill.mutate(detailOrder.id)}
+        onRequestBill={() =>
+          detailOrder &&
+          requestBill.mutate(detailOrder.id, {
+            onSuccess: async () => {
+              if (!detailTable) return;
+              const tables = await posRepo.listTables();
+              const fresh = tables.find((t) => t.id === detailTable.id);
+              if (fresh) await openTableDetail(fresh);
+            },
+          })
+        }
         onClear={() => detailTable && setClearTable(detailTable)}
       />
 
@@ -178,7 +147,23 @@ export function FloorPage() {
             <Button variant="outline" onClick={() => setSeatTable(null)}>
               Cancel
             </Button>
-            <Button onClick={() => seat.mutate()} disabled={seat.isPending}>
+            <Button
+              onClick={() =>
+                seatTable &&
+                seat.mutate(
+                  { tableId: seatTable.id, covers },
+                  {
+                    onSuccess: () => {
+                      toast.success(`Seated ${seatTable.name}`);
+                      setSeatTable(null);
+                      setDetailTable(null);
+                      navigate("/orders");
+                    },
+                  },
+                )
+              }
+              disabled={seat.isPending}
+            >
               Open order
             </Button>
           </>
@@ -209,7 +194,16 @@ export function FloorPage() {
         danger
         busy={clear.isPending}
         onClose={() => setClearTable(null)}
-        onConfirm={() => clearTable && clear.mutate(clearTable.id)}
+        onConfirm={() =>
+          clearTable &&
+          clear.mutate(clearTable.id, {
+            onSuccess: () => {
+              setClearTable(null);
+              setDetailTable(null);
+              setDetailOrder(null);
+            },
+          })
+        }
       />
     </div>
   );

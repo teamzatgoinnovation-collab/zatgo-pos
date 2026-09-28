@@ -73,6 +73,7 @@ export function MenuPage() {
       setOpen(false);
       setEditing(null);
     },
+    onError: (e: Error) => toast.error(e.message),
   });
 
   const remove = useMutation({
@@ -81,6 +82,7 @@ export function MenuPage() {
       void qc.invalidateQueries({ queryKey: ["pos"] });
       toast.success("Deleted");
     },
+    onError: (e: Error) => toast.error(e.message),
   });
 
   const columns = useMemo<ColumnDef<ProductRecord>[]>(

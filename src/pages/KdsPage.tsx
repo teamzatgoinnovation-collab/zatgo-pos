@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { Button, cn, PageHeader } from "@zatgo/ui";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -7,12 +7,7 @@ import { DocumentPreviewDialog } from "@/components/pos/DocumentPreviewDialog";
 import { KdsTicketDialog } from "@/components/pos/KdsTicketDialog";
 import { OrderDetailDialog } from "@/components/pos/OrderDetailDialog";
 import { SendKitchenDialog } from "@/components/pos/SendKitchenDialog";
-import {
-  posRepo,
-  type KitchenStation,
-  type KdsTicket,
-  type OrderRecord,
-} from "@/lib/pos-repo";
+import { posRepo, type KdsTicket, type OrderRecord } from "@/lib/pos-repo";
 import { printPosDocument } from "@/lib/print";
 import {
   buildKitchenDocument,
@@ -20,6 +15,7 @@ import {
   type PosDocument,
 } from "@/lib/pos-document";
 import { useBusinessStore } from "@/store/business";
+import { usePosKdsActions, usePosOrderActions } from "@/hooks/usePosActions";
 
 const stationLabel = {
   grill: "Grill",
@@ -35,7 +31,6 @@ const statusBg = {
 } as const;
 
 export function KdsPage() {
-  const qc = useQueryClient();
   const profile = useBusinessStore((s) => s.profile);
   const [ticket, setTicket] = useState<KdsTicket | null>(null);
   const [order, setOrder] = useState<OrderRecord | null>(null);
@@ -50,86 +45,8 @@ export function KdsPage() {
     refetchInterval: 5_000,
   });
 
-  const invalidate = () => void qc.invalidateQueries({ queryKey: ["pos"] });
-
-  const advance = useMutation({
-    mutationFn: (itemId: string) => posRepo.advanceKdsItem(itemId),
-    onSuccess: (item) => {
-      invalidate();
-      setTicket((prev) =>
-        prev && prev.id === item.id ? { ...prev, status: item.status } : prev,
-      );
-      toast.success(`${item.name} → ${item.status}`);
-      if (item.status === "served") setTicket(null);
-    },
-  });
-
-  const recall = useMutation({
-    mutationFn: (itemId: string) => posRepo.recallKdsItem(itemId),
-    onSuccess: (item) => {
-      invalidate();
-      setTicket((prev) =>
-        prev && prev.id === item.id ? { ...prev, status: item.status } : prev,
-      );
-      toast.success(`Recalled ${item.name}`);
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  const bump = useMutation({
-    mutationFn: (station: keyof typeof stationLabel) =>
-      posRepo.bumpStationReady(station as KitchenStation),
-    onSuccess: ({ count }, station) => {
-      invalidate();
-      setBumpStation(null);
-      toast.success(
-        count
-          ? `Bumped ${count} ready on ${stationLabel[station]}`
-          : "Nothing ready to bump",
-      );
-    },
-  });
-
-  const send = useMutation({
-    mutationFn: (orderId: string) => posRepo.sendOrder(orderId),
-    onSuccess: () => {
-      invalidate();
-      setSendOpen(false);
-      toast.success("Order refreshed on KDS");
-    },
-  });
-
-  const saveNote = useMutation({
-    mutationFn: ({ orderId, note }: { orderId: string; note: string }) =>
-      posRepo.setOrderNote(orderId, note),
-    onSuccess: (updated) => {
-      invalidate();
-      setOrder(updated);
-      toast.success("Note saved");
-    },
-  });
-
-  const voidOrder = useMutation({
-    mutationFn: (orderId: string) => posRepo.voidOrder(orderId),
-    onSuccess: () => {
-      invalidate();
-      setVoidOpen(false);
-      setOrder(null);
-      setTicket(null);
-      toast.success("Order voided");
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  const giveToDelivery = useMutation({
-    mutationFn: (orderId: string) => posRepo.giveToDelivery(orderId),
-    onSuccess: (updated) => {
-      invalidate();
-      setOrder(null);
-      toast.success(`Order #${updated.number} given to Delivery`);
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
+  const { advance, recall, bump } = usePosKdsActions();
+  const { send, saveNote, voidOrder, giveToDelivery } = usePosOrderActions();
 
   const loadOrder = async (orderId: string) => {
     const full = await posRepo.getOrder(orderId);
@@ -221,8 +138,27 @@ export function KdsPage() {
         ticket={ticket}
         busy={busy}
         onClose={() => setTicket(null)}
-        onAdvance={() => ticket && advance.mutate(ticket.id)}
-        onRecall={() => ticket && recall.mutate(ticket.id)}
+        onAdvance={() =>
+          ticket &&
+          advance.mutate(ticket.id, {
+            onSuccess: (item) => {
+              setTicket((prev) =>
+                prev && prev.id === item.id ? { ...prev, status: item.status } : prev,
+              );
+              if (item.status === "served") setTicket(null);
+            },
+          })
+        }
+        onRecall={() =>
+          ticket &&
+          recall.mutate(ticket.id, {
+            onSuccess: (item) => {
+              setTicket((prev) =>
+                prev && prev.id === item.id ? { ...prev, status: item.status } : prev,
+              );
+            },
+          })
+        }
         onPrintOrder={() => ticket && void printOrderKitchen(ticket.orderId)}
         onViewOrder={() => {
           if (!ticket) return;
@@ -243,8 +179,16 @@ export function KdsPage() {
           setPreview(buildSaleDocument({ kind: "invoice", profile, order }));
         }}
         onVoid={() => setVoidOpen(true)}
-        onSaveNote={(note) => order && saveNote.mutate({ orderId: order.id, note })}
-        onGiveToDelivery={() => order && giveToDelivery.mutate(order.id)}
+        onSaveNote={(note) =>
+          order &&
+          saveNote.mutate(
+            { orderId: order.id, note },
+            { onSuccess: (updated) => setOrder(updated) },
+          )
+        }
+        onGiveToDelivery={() =>
+          order && giveToDelivery.mutate(order.id, { onSuccess: () => setOrder(null) })
+        }
       />
 
       <SendKitchenDialog
@@ -252,7 +196,9 @@ export function KdsPage() {
         order={order}
         busy={send.isPending}
         onClose={() => setSendOpen(false)}
-        onConfirm={() => order && send.mutate(order.id)}
+        onConfirm={() =>
+          order && send.mutate(order.id, { onSuccess: () => setSendOpen(false) })
+        }
       />
 
       <ConfirmDialog
@@ -267,7 +213,16 @@ export function KdsPage() {
         danger
         busy={voidOrder.isPending}
         onClose={() => setVoidOpen(false)}
-        onConfirm={() => order && voidOrder.mutate(order.id)}
+        onConfirm={() =>
+          order &&
+          voidOrder.mutate(order.id, {
+            onSuccess: () => {
+              setVoidOpen(false);
+              setOrder(null);
+              setTicket(null);
+            },
+          })
+        }
       />
 
       <ConfirmDialog
@@ -281,7 +236,9 @@ export function KdsPage() {
         confirmLabel="Bump station"
         busy={bump.isPending}
         onClose={() => setBumpStation(null)}
-        onConfirm={() => bumpStation && bump.mutate(bumpStation)}
+        onConfirm={() =>
+          bumpStation && bump.mutate(bumpStation, { onSuccess: () => setBumpStation(null) })
+        }
       />
 
       <DocumentPreviewDialog

@@ -39,6 +39,7 @@ import {
   type PosDocument,
 } from "@/lib/pos-document";
 import { useHasFeature } from "@/hooks/useHasFeature";
+import { usePosOrderActions, usePosKdsActions, usePosTableActions } from "@/hooks/usePosActions";
 import { hasFeature } from "@/lib/verticals";
 import { useBusinessStore } from "@/store/business";
 import {
@@ -240,7 +241,9 @@ export function SellPage() {
   const checkout = useMutation({
     mutationFn: () => {
       const metaError = validateInvoiceMeta(invoice);
-      if (metaError) throw new Error(metaError);
+      if (metaError) {
+        throw new Error(metaError);
+      }
       const tendered = Number.parseFloat(cashTendered);
       return posRepo
         .checkoutWalkIn(
@@ -293,7 +296,9 @@ export function SellPage() {
       presentSale(doc);
       scanRef.current?.focus();
     },
-    onError: (err: Error) => toast.error(err.message),
+    onError: (err: Error) => {
+      toast.error(err.message);
+    },
   });
 
   const beginInvoice = () => {
@@ -301,107 +306,9 @@ export function SellPage() {
     setInvoiceOpen(true);
   };
 
-  const send = useMutation({
-    mutationFn: (orderId: string) => posRepo.sendOrder(orderId),
-    onSuccess: () => {
-      invalidate();
-      setSendOpen(false);
-      toast.success("Sent to kitchen");
-    },
-  });
-
-  const saveNote = useMutation({
-    mutationFn: ({ orderId, note }: { orderId: string; note: string }) =>
-      posRepo.setOrderNote(orderId, note),
-    onSuccess: (updated) => {
-      invalidate();
-      setOrder(updated);
-      toast.success("Note saved");
-    },
-  });
-
-  const voidOrder = useMutation({
-    mutationFn: (orderId: string) => posRepo.voidOrder(orderId),
-    onSuccess: () => {
-      invalidate();
-      setVoidOpen(false);
-      setOrder(null);
-      toast.success("Order voided");
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  const giveToDelivery = useMutation({
-    mutationFn: (orderId: string) => posRepo.giveToDelivery(orderId),
-    onSuccess: (updated) => {
-      invalidate();
-      setOrder(null);
-      toast.success(`Order #${updated.number} given to Delivery`);
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  const advance = useMutation({
-    mutationFn: (itemId: string) => posRepo.advanceKdsItem(itemId),
-    onSuccess: (item) => {
-      invalidate();
-      setTicket((prev) =>
-        prev && prev.id === item.id ? { ...prev, status: item.status } : prev,
-      );
-      toast.success(`${item.name} → ${item.status}`);
-      if (item.status === "served") setTicket(null);
-    },
-  });
-
-  const recall = useMutation({
-    mutationFn: (itemId: string) => posRepo.recallKdsItem(itemId),
-    onSuccess: (item) => {
-      invalidate();
-      setTicket((prev) =>
-        prev && prev.id === item.id ? { ...prev, status: item.status } : prev,
-      );
-      toast.success(`Recalled ${item.name}`);
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  const seat = useMutation({
-    mutationFn: async () => {
-      if (!seatTable) throw new Error("No table");
-      return posRepo.seatTable(seatTable.id, covers);
-    },
-    onSuccess: async (opened) => {
-      invalidate();
-      toast.success(`Seated ${seatTable?.name}`);
-      setSeatTable(null);
-      setHub(null);
-      setOrder(opened);
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  const clearTbl = useMutation({
-    mutationFn: (tableId: string) => posRepo.setTableStatus(tableId, "free"),
-    onSuccess: () => {
-      invalidate();
-      setClearTable(null);
-      setTable(null);
-      setTableOrder(null);
-      toast.success("Table cleared");
-    },
-  });
-
-  const requestBill = useMutation({
-    mutationFn: (orderId: string) => posRepo.markBilling(orderId),
-    onSuccess: async () => {
-      invalidate();
-      toast.success("Table marked for billing");
-      if (table) {
-        const fresh = (await posRepo.listTables()).find((t) => t.id === table.id);
-        if (fresh) await openTable(fresh);
-      }
-    },
-  });
+  const { send, saveNote, voidOrder, giveToDelivery } = usePosOrderActions();
+  const { advance, recall } = usePosKdsActions();
+  const { seat, clearTable: clearTbl, requestBill } = usePosTableActions();
 
   const openTable = async (row: TableRecord) => {
     setTable(row);
@@ -667,10 +574,15 @@ export function SellPage() {
         }}
         onVoid={() => setVoidOpen(true)}
         onSaveNote={(note) =>
-          detailOrder && saveNote.mutate({ orderId: detailOrder.id, note })
+          detailOrder &&
+          saveNote.mutate(
+            { orderId: detailOrder.id, note },
+            { onSuccess: (updated) => setOrder(updated) },
+          )
         }
         onGiveToDelivery={() =>
-          detailOrder && giveToDelivery.mutate(detailOrder.id)
+          detailOrder &&
+          giveToDelivery.mutate(detailOrder.id, { onSuccess: () => setOrder(null) })
         }
       />
 
@@ -679,7 +591,9 @@ export function SellPage() {
         order={detailOrder}
         busy={send.isPending}
         onClose={() => setSendOpen(false)}
-        onConfirm={() => detailOrder && send.mutate(detailOrder.id)}
+        onConfirm={() =>
+          detailOrder && send.mutate(detailOrder.id, { onSuccess: () => setSendOpen(false) })
+        }
       />
 
       <ConfirmDialog
@@ -694,7 +608,15 @@ export function SellPage() {
         danger
         busy={voidOrder.isPending}
         onClose={() => setVoidOpen(false)}
-        onConfirm={() => detailOrder && voidOrder.mutate(detailOrder.id)}
+        onConfirm={() =>
+          detailOrder &&
+          voidOrder.mutate(detailOrder.id, {
+            onSuccess: () => {
+              setVoidOpen(false);
+              setOrder(null);
+            },
+          })
+        }
       />
 
       <KdsTicketDialog
@@ -702,8 +624,27 @@ export function SellPage() {
         ticket={ticket}
         busy={advance.isPending || recall.isPending}
         onClose={() => setTicket(null)}
-        onAdvance={() => ticket && advance.mutate(ticket.id)}
-        onRecall={() => ticket && recall.mutate(ticket.id)}
+        onAdvance={() =>
+          ticket &&
+          advance.mutate(ticket.id, {
+            onSuccess: (item) => {
+              setTicket((prev) =>
+                prev && prev.id === item.id ? { ...prev, status: item.status } : prev,
+              );
+              if (item.status === "served") setTicket(null);
+            },
+          })
+        }
+        onRecall={() =>
+          ticket &&
+          recall.mutate(ticket.id, {
+            onSuccess: (item) => {
+              setTicket((prev) =>
+                prev && prev.id === item.id ? { ...prev, status: item.status } : prev,
+              );
+            },
+          })
+        }
         onPrintOrder={() => {
           if (!ticket) return;
           void posRepo.getOrder(ticket.orderId).then((o) => printKitchen(o));
@@ -739,7 +680,16 @@ export function SellPage() {
             setOrder(tableOrder);
           }
         }}
-        onRequestBill={() => tableOrder && requestBill.mutate(tableOrder.id)}
+        onRequestBill={() =>
+          tableOrder &&
+          requestBill.mutate(tableOrder.id, {
+            onSuccess: async () => {
+              if (!table) return;
+              const fresh = (await posRepo.listTables()).find((t) => t.id === table.id);
+              if (fresh) await openTable(fresh);
+            },
+          })
+        }
         onClear={() => table && setClearTable(table)}
       />
 
@@ -752,7 +702,23 @@ export function SellPage() {
             <Button variant="outline" onClick={() => setSeatTable(null)}>
               Cancel
             </Button>
-            <Button onClick={() => seat.mutate()} disabled={seat.isPending}>
+            <Button
+              onClick={() =>
+                seatTable &&
+                seat.mutate(
+                  { tableId: seatTable.id, covers },
+                  {
+                    onSuccess: (opened) => {
+                      toast.success(`Seated ${seatTable.name}`);
+                      setSeatTable(null);
+                      setHub(null);
+                      setOrder(opened);
+                    },
+                  },
+                )
+              }
+              disabled={seat.isPending}
+            >
               Open order
             </Button>
           </>
@@ -779,7 +745,16 @@ export function SellPage() {
         danger
         busy={clearTbl.isPending}
         onClose={() => setClearTable(null)}
-        onConfirm={() => clearTable && clearTbl.mutate(clearTable.id)}
+        onConfirm={() =>
+          clearTable &&
+          clearTbl.mutate(clearTable.id, {
+            onSuccess: () => {
+              setClearTable(null);
+              setTable(null);
+              setTableOrder(null);
+            },
+          })
+        }
       />
 
       <ExtraPickerDialog

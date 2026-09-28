@@ -30,6 +30,7 @@ function createWindow() {
 
   if (process.env.VITE_DEV_SERVER_URL) {
     void mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL);
+    mainWindow.webContents.openDevTools();
   } else {
     void mainWindow.loadFile(path.join(process.env.DIST!, "index.html"));
   }

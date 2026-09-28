@@ -11,6 +11,7 @@ import { buildSaleDocument, type DocumentKind, type PosDocument } from "@/lib/po
 import { useBusinessStore } from "@/store/business";
 import { useLastSaleStore } from "@/store/last-sale";
 import { usePrinterStore } from "@/store/printer";
+import { usePosTableActions } from "@/hooks/usePosActions";
 
 export function BillingPage() {
   const qc = useQueryClient();
@@ -48,16 +49,7 @@ export function BillingPage() {
     }
   };
 
-  const markBilling = useMutation({
-    mutationFn: (orderId: string) => posRepo.markBilling(orderId),
-    onSuccess: async (_table, orderId) => {
-      void qc.invalidateQueries({ queryKey: ["pos"] });
-      toast.success("Table marked for billing");
-      const order = await posRepo.getOrder(orderId);
-      const doc = buildSaleDocument({ kind: "invoice", profile, order });
-      setPreview(doc);
-    },
-  });
+  const { requestBill: markBilling } = usePosTableActions();
 
   const previewInvoice = async (order: OrderRecord) => {
     const doc = buildSaleDocument({ kind: "invoice", profile, order });
@@ -168,7 +160,14 @@ export function BillingPage() {
               key={order.id}
               order={order}
               onInvoice={() => void previewInvoice(order)}
-              onBilling={() => markBilling.mutate(order.id)}
+              onBilling={() =>
+                markBilling.mutate(order.id, {
+                  onSuccess: async () => {
+                    const fresh = await posRepo.getOrder(order.id);
+                    setPreview(buildSaleDocument({ kind: "invoice", profile, order: fresh }));
+                  },
+                })
+              }
               onPay={() => pay.mutate(order.id)}
               busy={pay.isPending || markBilling.isPending}
             />

@@ -24,6 +24,7 @@ import {
   type PosDocument,
 } from "@/lib/pos-document";
 import { useBusinessStore } from "@/store/business";
+import { usePosOrderActions } from "@/hooks/usePosActions";
 
 export function OrdersPage() {
   const qc = useQueryClient();
@@ -106,46 +107,7 @@ export function OrdersPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const send = useMutation({
-    mutationFn: (orderId: string) => posRepo.sendOrder(orderId),
-    onSuccess: () => {
-      invalidate();
-      setSendOpen(false);
-      toast.success("Sent to kitchen");
-    },
-  });
-
-  const saveNote = useMutation({
-    mutationFn: ({ orderId, note }: { orderId: string; note: string }) =>
-      posRepo.setOrderNote(orderId, note),
-    onSuccess: () => {
-      invalidate();
-      toast.success("Note saved");
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  const voidOrder = useMutation({
-    mutationFn: (orderId: string) => posRepo.voidOrder(orderId),
-    onSuccess: () => {
-      invalidate();
-      setVoidOpen(false);
-      setDetailOpen(false);
-      setSelectedId(null);
-      toast.success("Order voided");
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  const giveToDelivery = useMutation({
-    mutationFn: (orderId: string) => posRepo.giveToDelivery(orderId),
-    onSuccess: (updated) => {
-      invalidate();
-      setDetailOpen(false);
-      toast.success(`Order #${updated.number} given to Delivery`);
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
+  const { send, saveNote, voidOrder, giveToDelivery } = usePosOrderActions();
 
   const commitToOrder = (product: ProductRecord, extras: SelectedExtra[] = []) => {
     if (!selected) {
@@ -293,7 +255,9 @@ export function OrdersPage() {
         order={selected}
         busy={send.isPending}
         onClose={() => setSendOpen(false)}
-        onConfirm={() => selected && send.mutate(selected.id)}
+        onConfirm={() =>
+          selected && send.mutate(selected.id, { onSuccess: () => setSendOpen(false) })
+        }
       />
 
       <OrderDetailDialog
@@ -312,7 +276,9 @@ export function OrdersPage() {
         onSaveNote={(note) =>
           selected && saveNote.mutate({ orderId: selected.id, note })
         }
-        onGiveToDelivery={() => selected && giveToDelivery.mutate(selected.id)}
+        onGiveToDelivery={() =>
+          selected && giveToDelivery.mutate(selected.id, { onSuccess: () => setDetailOpen(false) })
+        }
       />
 
       <ConfirmDialog
@@ -327,7 +293,16 @@ export function OrdersPage() {
         danger
         busy={voidOrder.isPending}
         onClose={() => setVoidOpen(false)}
-        onConfirm={() => selected && voidOrder.mutate(selected.id)}
+        onConfirm={() =>
+          selected &&
+          voidOrder.mutate(selected.id, {
+            onSuccess: () => {
+              setVoidOpen(false);
+              setDetailOpen(false);
+              setSelectedId(null);
+            },
+          })
+        }
       />
 
       <DocumentPreviewDialog

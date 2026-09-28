@@ -25,6 +25,7 @@ import {
 } from "@/lib/pos-document";
 import { useBusinessStore } from "@/store/business";
 import { usePosOrderActions } from "@/hooks/usePosActions";
+import { lineUnitPrice } from "@/lib/extras";
 
 export function OrdersPage() {
   const qc = useQueryClient();
@@ -84,11 +85,15 @@ export function OrdersPage() {
       orderId,
       menuItemId,
       extras,
+      price,
+      station,
     }: {
       orderId: string;
       menuItemId: string;
       extras?: SelectedExtra[];
-    }) => posRepo.addItemToOrder(orderId, menuItemId, 1, extras),
+      price: number;
+      station: ProductRecord["station"];
+    }) => posRepo.addItemToOrder(orderId, menuItemId, 1, extras, price, station),
     onSuccess: invalidate,
     onError: (e: Error) => toast.error(e.message),
   });
@@ -114,7 +119,13 @@ export function OrdersPage() {
       toast.message("Select or open a check first");
       return;
     }
-    addItem.mutate({ orderId: selected.id, menuItemId: product.id, extras });
+    addItem.mutate({
+      orderId: selected.id,
+      menuItemId: product.id,
+      extras,
+      price: lineUnitPrice(product.price, extras),
+      station: product.station,
+    });
   };
 
   const onAddProduct = (product: ProductRecord) => {

@@ -534,12 +534,16 @@ export const posRepo = {
     menuItemId: string,
     qty: number,
     extras?: SelectedExtra[],
+    price?: number,
+    station?: KitchenStation,
   ): Promise<OrderRecord> {
     const env = await callZatGoApi<Record<string, unknown>>(ZatGoApi.restoPos.ordersAddItem, {
       order_id: orderId,
       item_code: menuItemId,
       qty,
       extras,
+      rate: price,
+      station,
     });
     return mapOrder(env.data ?? {});
   },

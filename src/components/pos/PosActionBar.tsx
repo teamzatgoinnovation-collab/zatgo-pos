@@ -87,7 +87,7 @@ export function PosActionBar({
   ).filter((a) => !a.feature || effectiveHasFeature(profile, a.feature, modules) && siteAllows(site, a.feature));
 
   return (
-    <div className="flex gap-1.5 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+    <div className="flex min-w-0 flex-1 gap-1.5 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       {actions.map((action) => {
         const Icon = action.icon;
         return (

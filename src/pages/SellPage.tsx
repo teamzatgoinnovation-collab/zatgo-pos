@@ -411,41 +411,42 @@ export function SellPage() {
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-3">
-      <h1 className="flex items-baseline gap-2 text-base font-semibold leading-none tracking-tight">
-        POS
-        <span className="text-xs font-normal text-[var(--color-muted-foreground)]">
-          {profile.shortLabel}
-        </span>
-      </h1>
+      <div className="grid min-h-0 flex-1 gap-3 xl:grid-cols-[minmax(0,1fr)_clamp(360px,24vw,460px)]">
+        <section className="flex min-h-0 min-w-0 flex-col gap-3">
+        <div className="flex items-center gap-3">
+        <h1 className="flex shrink-0 items-baseline gap-2 text-base font-semibold leading-none tracking-tight">
+          POS
+          <span className="text-xs font-normal text-[var(--color-muted-foreground)]">
+            {profile.shortLabel}
+          </span>
+        </h1>
 
-      <PosActionBar
-        counts={{
-          orders: openOrders.length,
-          invoices: payments.length,
-          kds: kdsTickets.length,
-          floor: tables.filter((t) => t.status !== "free").length,
-        }}
-        canReprint={Boolean(lastDocument)}
-        heldCount={held.length}
-        active={hub}
-        onOpen={onHubOpen}
-      />
+        <PosActionBar
+          counts={{
+            orders: openOrders.length,
+            invoices: payments.length,
+            kds: kdsTickets.length,
+            floor: tables.filter((t) => t.status !== "free").length,
+          }}
+          canReprint={Boolean(lastDocument)}
+          heldCount={held.length}
+          active={hub}
+          onOpen={onHubOpen}
+        />
+        </div>
 
-      <HeldSalesBar
-        held={held}
-        onResume={(id) => {
-          resume(id);
-          toast.message("Held sale restored");
-          scanRef.current?.focus();
-        }}
-        onDiscard={(id) => {
-          discardHeld(id);
-          toast.message("Held sale discarded");
-        }}
-      />
-
-      <div className="grid min-h-0 flex-1 gap-3 xl:grid-cols-[minmax(0,1fr)_360px]">
-        <section className="flex min-h-0 flex-col gap-3">
+        <HeldSalesBar
+          held={held}
+          onResume={(id) => {
+            resume(id);
+            toast.message("Held sale restored");
+            scanRef.current?.focus();
+          }}
+          onDiscard={(id) => {
+            discardHeld(id);
+            toast.message("Held sale discarded");
+          }}
+        />
           <BarcodeScanField
             value={scan}
             onChange={setScan}

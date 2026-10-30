@@ -43,7 +43,7 @@ export function InvoiceMetaPanel({
     .join(" · ");
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-1">
       <div className="flex gap-1">
         {types
           .filter((t) => !t.hide)
@@ -53,7 +53,7 @@ export function InvoiceMetaPanel({
               type="button"
               onClick={() => onSaleType(t.id)}
               className={cn(
-                "flex h-8 flex-1 items-center justify-center gap-1 rounded-[var(--radius-lg)] border text-xs font-medium transition-colors",
+                "flex h-7 flex-1 items-center justify-center gap-1 rounded-[var(--radius-lg)] border text-xs font-medium transition-colors",
                 invoice.saleType === t.id
                   ? "border-[var(--color-primary)] bg-[var(--pos-sidebar-active)]"
                   : "border-[var(--color-border)] text-[var(--color-muted-foreground)]",
@@ -74,20 +74,12 @@ export function InvoiceMetaPanel({
       <button
         type="button"
         onClick={onOpenDetails}
-        className="flex w-full items-start gap-2 rounded-[var(--radius-lg)] border border-[var(--color-border)] px-3 py-2 text-left text-xs transition-colors hover:bg-[var(--color-muted)]"
+        className="flex h-7 w-full items-center gap-1.5 rounded-[var(--radius-lg)] border border-[var(--color-border)] px-2 text-left text-xs transition-colors hover:bg-[var(--color-muted)]"
+        title={summary}
       >
-        <MapPin className="mt-0.5 size-3.5 shrink-0 text-[var(--color-muted-foreground)]" />
-        <span className="min-w-0">
-          <span className="block font-medium text-[var(--color-foreground)]">
-            Invoice details
-          </span>
-          <span className="block truncate text-[var(--color-muted-foreground)]">
-            {summary}
-          </span>
-        </span>
-        <span className="ml-auto flex h-7 shrink-0 items-center px-2 text-xs font-medium text-[var(--color-muted-foreground)]">
-          Edit
-        </span>
+        <MapPin className="size-3 shrink-0 text-[var(--color-muted-foreground)]" />
+        <span className="min-w-0 flex-1 truncate text-[var(--color-muted-foreground)]">{summary}</span>
+        <span className="shrink-0 font-medium text-[var(--color-foreground)]">Edit</span>
       </button>
     </div>
   );

@@ -4,6 +4,7 @@ import { AnimatePresence } from "framer-motion";
 import type { OrderItem, OrderRecord } from "@/lib/pos-repo";
 import { formatExtras } from "@/lib/extras";
 import { CartLineItem } from "./CartLineItem";
+import { money } from "@/lib/money";
 
 export function OrderTicketPanel({
   order,
@@ -75,7 +76,7 @@ export function OrderTicketPanel({
         </div>
         <div className="text-right">
           <p className="text-xs text-[var(--color-muted-foreground)]">Total</p>
-          <p className="text-xl font-semibold tabular-nums">${total.toFixed(2)}</p>
+          <p className="text-xl font-semibold tabular-nums">{money(total)}</p>
           {onOpenDetails ? (
             <Button
               variant="ghost"

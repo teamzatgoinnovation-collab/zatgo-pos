@@ -50,6 +50,7 @@ import {
 } from "@/store/cart";
 import { useLastSaleStore } from "@/store/last-sale";
 import { usePrinterStore } from "@/store/printer";
+import { money } from "@/lib/money";
 
 export function SellPage() {
   const profile = useBusinessStore((s) => s.profile);
@@ -94,7 +95,6 @@ export function SellPage() {
   const setMethod = useCartStore((s) => s.setMethod);
   const setCashTendered = useCartStore((s) => s.setCashTendered);
   const setDiscount = useCartStore((s) => s.setDiscount);
-  const setTaxRate = useCartStore((s) => s.setTaxRate);
   const setSaleType = useCartStore((s) => s.setSaleType);
   const setInvoice = useCartStore((s) => s.setInvoice);
   const qtyOf = useCartStore((s) => s.qtyOf);
@@ -276,8 +276,8 @@ export function SellPage() {
       setInvoiceOpen(false);
       toast.success(
         saleOrder.channel === "delivery" && saleOrder.delivery?.deliveryBoyName
-          ? `Invoice #${payment.orderNumber} · $${payment.amount.toFixed(2)} → ${saleOrder.delivery.deliveryBoyName}`
-          : `Invoice #${payment.orderNumber} · $${payment.amount.toFixed(2)}`,
+          ? `Invoice #${payment.orderNumber} · ${money(payment.amount)} → ${saleOrder.delivery.deliveryBoyName}`
+          : `Invoice #${payment.orderNumber} · ${money(payment.amount)}`,
       );
       clear();
       const doc = buildSaleDocument({
@@ -411,14 +411,12 @@ export function SellPage() {
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-3">
-      <div className="flex flex-wrap items-end justify-between gap-2">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">POS</h1>
-          <p className="text-sm text-[var(--color-muted-foreground)]">
-            {profile.shortLabel} — open Orders, Invoices, Kitchen & Floor from the bar
-          </p>
-        </div>
-      </div>
+      <h1 className="flex items-baseline gap-2 text-base font-semibold leading-none tracking-tight">
+        POS
+        <span className="text-xs font-normal text-[var(--color-muted-foreground)]">
+          {profile.shortLabel}
+        </span>
+      </h1>
 
       <PosActionBar
         counts={{
@@ -446,7 +444,7 @@ export function SellPage() {
         }}
       />
 
-      <div className="grid min-h-0 flex-1 gap-3 xl:grid-cols-[minmax(0,1fr)_380px]">
+      <div className="grid min-h-0 flex-1 gap-3 xl:grid-cols-[minmax(0,1fr)_360px]">
         <section className="flex min-h-0 flex-col gap-3">
           <BarcodeScanField
             value={scan}
@@ -483,7 +481,6 @@ export function SellPage() {
             onMethodChange={setMethod}
             onCashTenderedChange={setCashTendered}
             onDiscountChange={setDiscount}
-            onTaxRateChange={setTaxRate}
             onSaleType={setSaleType}
             onEditInvoice={beginInvoice}
             onCharge={beginInvoice}

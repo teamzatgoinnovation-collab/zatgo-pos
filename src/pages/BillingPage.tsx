@@ -12,6 +12,7 @@ import { useBusinessStore } from "@/store/business";
 import { useLastSaleStore } from "@/store/last-sale";
 import { usePrinterStore } from "@/store/printer";
 import { usePosTableActions } from "@/hooks/usePosActions";
+import { money } from "@/lib/money";
 
 export function BillingPage() {
   const qc = useQueryClient();
@@ -60,7 +61,7 @@ export function BillingPage() {
     mutationFn: (orderId: string) => posRepo.payOrder(orderId, method),
     onSuccess: async ({ payment, order }) => {
       void qc.invalidateQueries({ queryKey: ["pos"] });
-      toast.success(`Paid $${payment.amount.toFixed(2)} via ${payment.method}`);
+      toast.success(`Paid ${money(payment.amount)} via ${payment.method}`);
       const doc = buildSaleDocument({
         kind: "receipt",
         profile,
@@ -94,7 +95,7 @@ export function BillingPage() {
       {
         accessorKey: "amount",
         header: "Amount",
-        cell: ({ row }) => `$${row.original.amount.toFixed(2)}`,
+        cell: ({ row }) => `${money(row.original.amount)}`,
       },
       {
         accessorKey: "paidAt",
@@ -211,7 +212,7 @@ function BillRow({
           #{order.number} · {order.tableName}
         </p>
         <p className="text-sm text-[var(--color-muted-foreground)] capitalize">
-          {order.status} · {order.items.length} lines · ${posRepo.orderTotal(order).toFixed(2)}
+          {order.status} · {order.items.length} lines · {money(posRepo.orderTotal(order))}
         </p>
       </div>
       <div className="flex flex-wrap gap-2">

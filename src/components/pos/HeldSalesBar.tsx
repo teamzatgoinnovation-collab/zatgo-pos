@@ -1,6 +1,7 @@
 import { Button, cn } from "@zatgo/ui";
 import { Play, X } from "@zatgo/icons";
 import { cartItemCount, cartPricing, type HeldSale } from "@/store/cart";
+import { money } from "@/lib/money";
 
 export function HeldSalesBar({
   held,
@@ -34,7 +35,7 @@ export function HeldSalesBar({
             <div className="min-w-0 px-1">
               <p className="truncate text-xs font-medium">{sale.label}</p>
               <p className="text-[11px] tabular-nums text-[var(--color-muted-foreground)]">
-                {count} items · ${pricing.total.toFixed(2)}
+                {count} items · {money(pricing.total)}
               </p>
             </div>
             <Button

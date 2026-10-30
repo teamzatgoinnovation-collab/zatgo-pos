@@ -24,7 +24,7 @@ export function FeaturePreferences() {
           </h2>
           <p className="mt-0.5 text-xs text-[var(--color-muted-foreground)]">
             Turn tables, orders, and kitchen on or off for this terminal. Defaults follow{" "}
-            {profile.shortLabel}; changing business profile resets these.
+            {profile.shortLabel}; the business profile comes from the site.
           </p>
         </div>
         <Button

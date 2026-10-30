@@ -1,5 +1,6 @@
 import { cn } from "@zatgo/ui";
 import type { PosDocument } from "@/lib/pos-document";
+import { money } from "@/lib/money";
 
 export function ReceiptDocument({
   doc,
@@ -73,7 +74,7 @@ export function ReceiptDocument({
                 ) : null}
                 {!isKitchen ? (
                   <p className="text-[11px] text-neutral-600">
-                    {line.qty} × ${line.unitPrice.toFixed(2)}
+                    {line.qty} × {money(line.unitPrice)}
                   </p>
                 ) : null}
                 {line.meta ? (
@@ -81,7 +82,7 @@ export function ReceiptDocument({
                 ) : null}
               </div>
               {!isKitchen ? (
-                <span className="tabular-nums">${line.total.toFixed(2)}</span>
+                <span className="tabular-nums">{money(line.total)}</span>
               ) : null}
             </li>
           ))
@@ -92,20 +93,20 @@ export function ReceiptDocument({
         <>
           <div className="my-3 border-t border-dashed border-neutral-400" />
           <div className="space-y-1">
-            <Row label="Subtotal" value={`$${doc.subtotal.toFixed(2)}`} />
+            <Row label="Subtotal" value={`${money(doc.subtotal)}`} />
             {doc.discount > 0 ? (
-              <Row label="Discount" value={`−$${doc.discount.toFixed(2)}`} />
+              <Row label="Discount" value={`−${money(doc.discount)}`} />
             ) : null}
-            <Row label="Tax" value={`$${doc.tax.toFixed(2)}`} />
-            <Row label="Total" value={`$${doc.total.toFixed(2)}`} strong />
+            <Row label="Tax" value={`${money(doc.tax)}`} />
+            <Row label="Total" value={`${money(doc.total)}`} strong />
             {doc.paymentMethod ? (
               <Row label="Paid" value={doc.paymentMethod} capitalize />
             ) : null}
             {doc.cashTendered !== undefined ? (
-              <Row label="Tendered" value={`$${doc.cashTendered.toFixed(2)}`} />
+              <Row label="Tendered" value={`${money(doc.cashTendered)}`} />
             ) : null}
             {doc.changeDue !== undefined ? (
-              <Row label="Change" value={`$${doc.changeDue.toFixed(2)}`} />
+              <Row label="Change" value={`${money(doc.changeDue)}`} />
             ) : null}
           </div>
         </>

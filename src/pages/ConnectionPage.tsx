@@ -9,8 +9,7 @@ import {
   logoutFromErpnext,
   testConnection,
 } from "@/lib/client";
-import { VERTICALS, type VerticalId } from "@/lib/verticals";
-import { useBusinessStore } from "@/store/business";
+import { useSiteStore } from "@/store/site";
 import { useSessionStore } from "@/store/session";
 
 const inputClass =
@@ -24,8 +23,7 @@ export function ConnectionPage() {
   const user = useSessionStore((s) => s.user);
   const fullName = useSessionStore((s) => s.fullName);
   const lastError = useSessionStore((s) => s.lastError);
-  const verticalId = useBusinessStore((s) => s.verticalId);
-  const setVertical = useBusinessStore((s) => s.setVertical);
+  const site = useSiteStore((s) => s.profile);
 
   const [baseUrl, setBaseUrl] = useState(connection.baseUrl);
   const [usr, setUsr] = useState(user ?? "");
@@ -79,47 +77,29 @@ export function ConnectionPage() {
     }
   };
 
-  const onPickVertical = (id: VerticalId) => {
-    setVertical(id);
-    toast.success(
-      `Business profile: ${VERTICALS.find((v) => v.id === id)?.label} — module prefs reset to defaults`,
-    );
-  };
-
   return (
     <div>
       <PageHeader
         title="Setup"
-        description="Business profile, module preferences (tables / kitchen), printer, and ERPNext sign-in."
+        description="Site profile, module preferences (tables / kitchen), printer, and ERPNext sign-in."
       />
 
       <FeaturePreferences />
 
       <PrinterSettings />
 
-      <section className="mb-8">
-        <h2 className="mb-3 text-sm font-medium text-[var(--color-muted-foreground)]">
-          Business profile
-        </h2>
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {VERTICALS.map((v) => (
-            <button
-              key={v.id}
-              type="button"
-              onClick={() => onPickVertical(v.id)}
-              className={cn(
-                "rounded-[var(--radius-lg)] border p-4 text-left transition-colors",
-                verticalId === v.id
-                  ? "border-[var(--color-primary)] bg-[var(--pos-sidebar-active)]"
-                  : "border-[var(--color-border)] hover:bg-[var(--color-muted)]",
-              )}
-            >
-              <p className="font-semibold">{v.label}</p>
-              <p className="mt-1 text-xs text-[var(--color-muted-foreground)]">{v.description}</p>
-            </button>
-          ))}
-        </div>
-      </section>
+      {site ? (
+        <section className="mb-8 text-sm">
+          <h2 className="mb-2 font-medium text-[var(--color-muted-foreground)]">Site profile</h2>
+          <p>
+            Company {site.company ?? "—"} · {site.currency ?? "—"} · industries:{" "}
+            {site.industries.length ? site.industries.join(", ") : "none"}
+          </p>
+          <p className="text-xs text-[var(--color-muted-foreground)]">
+            Set in ZG System Settings on the site, not in this app.
+          </p>
+        </section>
+      ) : null}
 
       <form
         className="max-w-xl space-y-4 rounded-[var(--radius-lg)] border border-[var(--color-border)] p-4"

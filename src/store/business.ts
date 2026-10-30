@@ -6,25 +6,10 @@ import {
 } from "@/lib/modules";
 import { getVertical, type VerticalId, type VerticalProfile } from "@/lib/verticals";
 
-const VERTICAL_KEY = "zatgo-pos-vertical";
 const MODULES_KEY = "zatgo-pos-modules";
 
+/** The business profile comes from the site (zatgo-core industries); the POS UI is the restaurant profile. */
 function readVertical(): VerticalId {
-  try {
-    const raw = localStorage.getItem(VERTICAL_KEY);
-    if (
-      raw === "restaurant" ||
-      raw === "cafe" ||
-      raw === "supermarket" ||
-      raw === "pharmacy" ||
-      raw === "electrical" ||
-      raw === "general"
-    ) {
-      return raw;
-    }
-  } catch {
-    /* ignore */
-  }
   return "restaurant";
 }
 
@@ -41,14 +26,6 @@ function readModules(verticalId: VerticalId): ModulePrefs {
     };
   } catch {
     return defaults;
-  }
-}
-
-function persistVertical(id: VerticalId) {
-  try {
-    localStorage.setItem(VERTICAL_KEY, id);
-  } catch {
-    /* ignore */
   }
 }
 
@@ -81,7 +58,6 @@ export const useBusinessStore = create<BusinessState>((set, get) => {
     modules,
     setVertical: (id) => {
       const nextModules = modulesFromVertical(id);
-      persistVertical(id);
       persistModules(nextModules);
       set({
         verticalId: id,

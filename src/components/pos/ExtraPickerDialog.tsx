@@ -2,6 +2,7 @@ import { Button, cn, FormDialog } from "@zatgo/ui";
 import { useEffect, useState } from "react";
 import type { ProductExtra, ProductRecord, SelectedExtra } from "@/lib/pos-repo";
 import { extrasTotal, lineUnitPrice } from "@/lib/extras";
+import { money } from "@/lib/money";
 
 export function ExtraPickerDialog({
   product,
@@ -56,14 +57,14 @@ export function ExtraPickerDialog({
               setSelectedIds([]);
             }}
           >
-            Add · ${unit.toFixed(2)}
+            Add · {money(unit)}
           </Button>
         </>
       }
     >
       <p className="mb-3 text-sm text-[var(--color-muted-foreground)]">
-        Base ${product.price.toFixed(2)}
-        {extrasPrice > 0 ? ` · extras +$${extrasPrice.toFixed(2)}` : ""}
+        Base {money(product.price)}
+        {extrasPrice > 0 ? ` · extras +${money(extrasPrice)}` : ""}
       </p>
 
       <div className="grid gap-2 sm:grid-cols-2">
@@ -83,7 +84,7 @@ export function ExtraPickerDialog({
             >
               <p className="font-medium">+ {extra.name}</p>
               <p className="mt-0.5 text-xs tabular-nums text-[var(--color-muted-foreground)]">
-                {extra.price > 0 ? `+$${extra.price.toFixed(2)}` : "No charge"}
+                {extra.price > 0 ? `+${money(extra.price)}` : "No charge"}
               </p>
             </button>
           );

@@ -1,6 +1,6 @@
-import { Button, cn } from "@zatgo/ui";
-import { Minus, Plus, Trash2 } from "@zatgo/icons";
-import { motion } from "framer-motion";
+import { cn } from "@zatgo/ui";
+import { Minus, Plus, X } from "@zatgo/icons";
+import { money } from "@/lib/money";
 
 export type LineDisplay = {
   id: string;
@@ -13,6 +13,10 @@ export type LineDisplay = {
   editable?: boolean;
 };
 
+const iconButton =
+  "flex size-7 shrink-0 items-center justify-center rounded-[var(--radius-lg)] text-[var(--color-muted-foreground)] transition-colors hover:bg-[var(--color-muted)] hover:text-[var(--color-foreground)] active:bg-[var(--color-muted)]";
+
+/** One dense cart row (~36px): name, qty stepper, line total, remove. */
 export function CartLineItem({
   line,
   onIncrement,
@@ -26,71 +30,47 @@ export function CartLineItem({
 }) {
   const lineTotal = line.qty * line.unitPrice;
   const editable = line.editable !== false;
+  const detail = [line.extras, line.meta].filter(Boolean).join(" · ");
 
   return (
-    <motion.li
-      layout
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, x: 16 }}
+    <li
       className={cn(
-        "rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-background)] p-3",
+        "flex h-9 items-center gap-1.5 border-b border-[var(--color-border)] px-2 last:border-b-0",
       )}
+      title={`${line.name} — ${money(line.unitPrice)}${line.unit ? ` / ${line.unit}` : ""}${detail ? ` (${detail})` : ""}`}
     >
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="truncate text-sm font-medium leading-snug">{line.name}</p>
-          {line.extras ? (
-            <p className="mt-0.5 text-xs text-[var(--color-muted-foreground)]">{line.extras}</p>
-          ) : null}
-          <p className="mt-0.5 text-xs tabular-nums text-[var(--color-muted-foreground)]">
-            ${line.unitPrice.toFixed(2)}
-            {line.unit ? ` / ${line.unit}` : ""} each
-            {line.meta ? ` · ${line.meta}` : ""}
-          </p>
-        </div>
-        {editable && onRemove ? (
-          <button
-            type="button"
-            onClick={onRemove}
-            className="rounded-[var(--radius-lg)] p-1.5 text-[var(--color-muted-foreground)] transition-colors hover:bg-[var(--color-muted)] hover:text-[var(--color-foreground)]"
-            aria-label={`Remove ${line.name}`}
-          >
-            <Trash2 className="size-3.5" />
-          </button>
+      <p className="min-w-0 flex-1 truncate text-sm leading-none">
+        {line.name}
+        {detail ? (
+          <span className="ml-1 text-xs text-[var(--color-muted-foreground)]">{detail}</span>
         ) : null}
-      </div>
+      </p>
 
-      <div className="mt-3 flex items-center justify-between gap-2">
-        {editable && onIncrement && onDecrement ? (
-          <div className="flex items-center gap-1 rounded-[var(--radius-lg)] border border-[var(--color-border)] p-0.5">
-            <Button
-              variant="ghost"
-              className="size-8 p-0"
-              onClick={onDecrement}
-              aria-label="Decrease quantity"
-            >
-              <Minus className="size-3.5" />
-            </Button>
-            <span className="min-w-8 text-center text-sm font-semibold tabular-nums">
-              {line.qty}
-            </span>
-            <Button
-              variant="ghost"
-              className="size-8 p-0"
-              onClick={onIncrement}
-              aria-label="Increase quantity"
-            >
-              <Plus className="size-3.5" />
-            </Button>
-          </div>
-        ) : (
-          <span className="text-sm tabular-nums text-[var(--color-muted-foreground)]">
-            ×{line.qty}
-          </span>
-        )}
-        <span className="text-sm font-semibold tabular-nums">${lineTotal.toFixed(2)}</span>
-      </div>
-    </motion.li>
+      {editable && onIncrement && onDecrement ? (
+        <div className="flex shrink-0 items-center">
+          <button type="button" className={iconButton} onClick={onDecrement} aria-label="Decrease quantity">
+            <Minus className="size-3.5" />
+          </button>
+          <span className="min-w-5 text-center text-sm font-semibold tabular-nums">{line.qty}</span>
+          <button type="button" className={iconButton} onClick={onIncrement} aria-label="Increase quantity">
+            <Plus className="size-3.5" />
+          </button>
+        </div>
+      ) : (
+        <span className="shrink-0 text-sm tabular-nums text-[var(--color-muted-foreground)]">
+          ×{line.qty}
+        </span>
+      )}
+
+      <span className="w-[4.75rem] shrink-0 text-right text-sm font-semibold tabular-nums">
+        {money(lineTotal)}
+      </span>
+
+      {editable && onRemove ? (
+        <button type="button" className={iconButton} onClick={onRemove} aria-label={`Remove ${line.name}`}>
+          <X className="size-3.5" />
+        </button>
+      ) : null}
+    </li>
   );
 }

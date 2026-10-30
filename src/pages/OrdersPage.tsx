@@ -26,6 +26,7 @@ import {
 import { useBusinessStore } from "@/store/business";
 import { usePosOrderActions } from "@/hooks/usePosActions";
 import { lineUnitPrice } from "@/lib/extras";
+import { money } from "@/lib/money";
 
 export function OrdersPage() {
   const qc = useQueryClient();
@@ -355,7 +356,7 @@ function OrderListButton({
           #{order.number} · {order.tableName}
         </span>
         <span className="text-xs text-[var(--color-muted-foreground)] capitalize">
-          {order.status} · ${posRepo.orderTotal(order).toFixed(2)}
+          {order.status} · {money(posRepo.orderTotal(order))}
           {order.note ? " · note" : ""}
         </span>
       </button>

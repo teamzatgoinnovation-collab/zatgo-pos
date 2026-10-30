@@ -4,6 +4,7 @@ import { RequireFeature } from "@/components/RequireFeature";
 import { AppShell } from "@/layouts/AppShell";
 import { hydrateErpnextSession } from "@/lib/client";
 import { BillingPage } from "@/pages/BillingPage";
+import { SiteGate } from "@/components/SiteGate";
 import { ConnectionPage } from "@/pages/ConnectionPage";
 import { DashboardPage } from "@/pages/DashboardPage";
 import { DeliveryBoysPage } from "@/pages/DeliveryBoysPage";
@@ -34,7 +35,9 @@ function AppRoutes() {
       <Route
         element={
           <RequireAuth>
-            <AppShell />
+            <SiteGate>
+              <AppShell />
+            </SiteGate>
           </RequireAuth>
         }
       >

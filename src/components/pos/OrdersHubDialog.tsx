@@ -2,6 +2,7 @@ import { Button, FormDialog } from "@zatgo/ui";
 import type { OrderRecord } from "@/lib/pos-repo";
 import { posRepo } from "@/lib/pos-repo";
 import { formatExtras } from "@/lib/extras";
+import { money } from "@/lib/money";
 
 export function OrdersHubDialog({
   open,
@@ -50,7 +51,7 @@ export function OrdersHubDialog({
                   </p>
                 </div>
                 <p className="text-sm font-semibold tabular-nums">
-                  ${posRepo.orderTotal(order).toFixed(2)}
+                  {money(posRepo.orderTotal(order))}
                 </p>
               </div>
               <ul className="mt-2 space-y-0.5 text-xs text-[var(--color-muted-foreground)]">

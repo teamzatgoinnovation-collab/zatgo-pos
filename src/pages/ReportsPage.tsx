@@ -3,6 +3,7 @@ import { useMemo } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { posRepo, type PaymentRecord } from "@/lib/pos-repo";
 import { PageHeader, DataTable } from "@zatgo/ui";
+import { money } from "@/lib/money";
 
 export function ReportsPage() {
   const { data: payments = [] } = useQuery({
@@ -27,7 +28,7 @@ export function ReportsPage() {
       {
         accessorKey: "amount",
         header: "Amount",
-        cell: ({ row }) => `$${row.original.amount.toFixed(2)}`,
+        cell: ({ row }) => `${money(row.original.amount)}`,
       },
       {
         accessorKey: "paidAt",
@@ -42,13 +43,13 @@ export function ReportsPage() {
     <div>
       <PageHeader
         title="Reports"
-        description="Shift sales snapshot from mock payments. Wire to resto_pos reporting later."
+        description="Settled checks from the site (Sales Invoice / Payment Entry)."
       />
 
       <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Stat label="Payments (mock)" value={String(payments.length)} />
-        <Stat label="Cash" value={`$${byMethod.cash.toFixed(2)}`} />
-        <Stat label="Card" value={`$${byMethod.card.toFixed(2)}`} />
+        <Stat label="Payments" value={String(payments.length)} />
+        <Stat label="Cash" value={`${money(byMethod.cash)}`} />
+        <Stat label="Card" value={`${money(byMethod.card)}`} />
         <Stat label="Open tickets" value={String(counts?.openOrders ?? "—")} />
       </div>
 

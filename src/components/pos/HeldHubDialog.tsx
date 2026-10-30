@@ -2,6 +2,7 @@ import { Button, FormDialog } from "@zatgo/ui";
 import { Play, X } from "@zatgo/icons";
 import { cartItemCount, cartPricing, type HeldSale } from "@/store/cart";
 import { formatExtras } from "@/lib/extras";
+import { money } from "@/lib/money";
 
 export function HeldHubDialog({
   open,
@@ -50,7 +51,7 @@ export function HeldHubDialog({
                     <p className="font-semibold">{sale.label}</p>
                     <p className="text-xs text-[var(--color-muted-foreground)]">
                       {new Date(sale.heldAt).toLocaleString()} · {cartItemCount(sale.lines)}{" "}
-                      items · ${pricing.total.toFixed(2)}
+                      items · {money(pricing.total)}
                     </p>
                   </div>
                   <div className="flex gap-1">

@@ -9,6 +9,8 @@ import {
 } from "@zatgo/icons";
 import { useBusinessStore } from "@/store/business";
 import { effectiveHasFeature } from "@/lib/modules";
+import { siteAllows } from "@/lib/site-features";
+import { useSiteStore } from "@/store/site";
 import type { PosFeature } from "@/lib/verticals";
 
 export type PosHubId = "orders" | "invoices" | "kds" | "floor" | "held" | "reprint";
@@ -37,6 +39,7 @@ export function PosActionBar({
 }) {
   const profile = useBusinessStore((s) => s.profile);
   const modules = useBusinessStore((s) => s.modules);
+  const site = useSiteStore((s) => s.profile);
 
   const actions: Action[] = (
     [
@@ -81,7 +84,7 @@ export function PosActionBar({
         disabled: !canReprint,
       },
     ] satisfies Action[]
-  ).filter((a) => !a.feature || effectiveHasFeature(profile, a.feature, modules));
+  ).filter((a) => !a.feature || effectiveHasFeature(profile, a.feature, modules) && siteAllows(site, a.feature));
 
   return (
     <div className="flex gap-1.5 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">

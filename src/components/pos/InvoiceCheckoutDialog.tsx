@@ -9,6 +9,7 @@ import {
   type SaleType,
   validateInvoiceMeta,
 } from "@/store/cart";
+import { money } from "@/lib/money";
 
 const inputClass =
   "mt-1 h-9 w-full rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-transparent px-3 text-sm outline-none focus:border-[var(--color-primary)]";
@@ -209,7 +210,7 @@ export function InvoiceCheckoutDialog({
             Back
           </Button>
           <Button onClick={confirm} disabled={busy}>
-            {busy ? "Charging…" : `Confirm & charge $${total.toFixed(2)}`}
+            {busy ? "Charging…" : `Confirm & charge ${money(total)}`}
           </Button>
         </>
       }

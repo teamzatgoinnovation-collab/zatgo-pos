@@ -1,6 +1,7 @@
 import { cn } from "@zatgo/ui";
 import { motion } from "framer-motion";
 import type { ProductRecord } from "@/lib/pos-repo";
+import { money } from "@/lib/money";
 
 export function ProductGrid({
   products,
@@ -19,7 +20,7 @@ export function ProductGrid({
     return (
       <div className="flex flex-1 items-center justify-center rounded-[var(--radius-lg)] border border-dashed border-[var(--color-border)] p-10">
         <p className="max-w-sm text-center text-sm text-[var(--color-muted-foreground)]">
-          No products match. Switch business profile or add catalog items.
+          No products match. Add catalog items in Menu.
         </p>
       </div>
     );
@@ -69,7 +70,7 @@ export function ProductGrid({
               {badges.length ? ` · ${badges.join(" · ")}` : ""}
             </p>
             <p className="mt-auto pt-3 text-base font-semibold tabular-nums">
-              ${product.price.toFixed(2)}
+              {money(product.price)}
               {product.unit ? (
                 <span className="text-xs font-normal text-[var(--color-muted-foreground)]">
                   {" "}

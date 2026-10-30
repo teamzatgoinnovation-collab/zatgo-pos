@@ -2,6 +2,7 @@ import { Button, cn, FormDialog } from "@zatgo/ui";
 import { ClipboardList, Receipt, Users } from "@zatgo/icons";
 import type { OrderRecord, TableRecord } from "@/lib/pos-repo";
 import { formatExtras } from "@/lib/extras";
+import { money } from "@/lib/money";
 
 const statusBg = {
   free: "bg-[var(--pos-floor-free)]",
@@ -70,7 +71,7 @@ export function TableDetailDialog({
             <span className="font-medium">
               Order #{order.number} · {order.server}
             </span>
-            <span className="tabular-nums font-semibold">${total.toFixed(2)}</span>
+            <span className="tabular-nums font-semibold">{money(total)}</span>
           </div>
           <ul className="max-h-[24vh] space-y-1.5 overflow-auto text-sm">
             {order.items.map((item) => (

@@ -11,7 +11,6 @@ type SessionState = {
   user: string | null;
   fullName: string | null;
   lastError: string | null;
-  allowMockWithoutLogin: boolean;
   setConnection: (patch: Partial<ConnectionConfig>) => void;
   setSession: (input: {
     connected: boolean;
@@ -21,7 +20,6 @@ type SessionState = {
     baseUrl?: string;
   }) => void;
   clearSession: () => void;
-  setAllowMockWithoutLogin: (value: boolean) => void;
 };
 
 const defaultBaseUrl =
@@ -36,7 +34,6 @@ export const useSessionStore = create<SessionState>()(
       user: null,
       fullName: null,
       lastError: null,
-      allowMockWithoutLogin: false,
       setConnection: (patch) =>
         set((state) => ({
           connection: { ...state.connection, ...patch },
@@ -62,15 +59,19 @@ export const useSessionStore = create<SessionState>()(
           fullName: null,
           lastError: null,
           connection: state.connection,
-          allowMockWithoutLogin: false,
         })),
-      setAllowMockWithoutLogin: (value) => set({ allowMockWithoutLogin: value }),
     }),
     {
       name: "zatgo-pos-session",
+      // An explicit VITE_FRAPPE_BASE_URL wins over the site saved from a previous run.
+      merge: (persisted, current) => {
+        const merged = { ...current, ...(persisted as Partial<SessionState>) };
+        const envUrl = import.meta.env?.VITE_FRAPPE_BASE_URL;
+        if (envUrl) merged.connection = { ...merged.connection, baseUrl: envUrl };
+        return merged;
+      },
       partialize: (s) => ({
         connection: { baseUrl: s.connection.baseUrl },
-        allowMockWithoutLogin: s.allowMockWithoutLogin,
       }),
     },
   ),

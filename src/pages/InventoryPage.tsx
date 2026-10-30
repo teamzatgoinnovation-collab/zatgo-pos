@@ -142,7 +142,7 @@ export function InventoryPage() {
     <div>
       <PageHeader
         title="Inventory"
-        description={`Stock for ${profile.label} (mock until backend APIs exist).`}
+        description={`Stock for ${profile.label} (live ERPNext stock; saving a quantity posts a Stock Entry).`}
         actions={
           <>
             <SearchField value={search} onChange={setSearch} placeholder="Search stock…" />

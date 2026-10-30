@@ -3,6 +3,7 @@ import { CookingPot, FileText, Printer, ScrollText, Truck } from "@zatgo/icons";
 import { useEffect, useState } from "react";
 import type { OrderRecord } from "@/lib/pos-repo";
 import { formatExtras } from "@/lib/extras";
+import { money } from "@/lib/money";
 
 export function OrderDetailDialog({
   open,
@@ -88,7 +89,7 @@ export function OrderDetailDialog({
         </div>
         <div className="text-right">
           <p className="text-xs text-[var(--color-muted-foreground)]">Total</p>
-          <p className="text-2xl font-semibold tabular-nums">${total.toFixed(2)}</p>
+          <p className="text-2xl font-semibold tabular-nums">{money(total)}</p>
         </div>
       </div>
 
@@ -114,7 +115,7 @@ export function OrderDetailDialog({
                   {item.station} · {item.status}
                 </p>
               </div>
-              <span className="tabular-nums">${(item.qty * item.price).toFixed(2)}</span>
+              <span className="tabular-nums">{money((item.qty * item.price))}</span>
             </li>
           ))
         )}

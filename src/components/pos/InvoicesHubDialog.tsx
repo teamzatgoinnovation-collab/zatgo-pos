@@ -1,6 +1,7 @@
 import { Button, FormDialog } from "@zatgo/ui";
 import { FileText, Printer } from "@zatgo/icons";
 import type { PaymentRecord } from "@/lib/pos-repo";
+import { money } from "@/lib/money";
 
 export function InvoicesHubDialog({
   open,
@@ -50,7 +51,7 @@ export function InvoicesHubDialog({
                 >
                   <td className="px-3 py-2.5 font-medium">#{payment.orderNumber}</td>
                   <td className="px-3 py-2.5 capitalize">{payment.method}</td>
-                  <td className="px-3 py-2.5 tabular-nums">${payment.amount.toFixed(2)}</td>
+                  <td className="px-3 py-2.5 tabular-nums">{money(payment.amount)}</td>
                   <td className="px-3 py-2.5 text-xs text-[var(--color-muted-foreground)]">
                     {new Date(payment.paidAt).toLocaleString()}
                   </td>

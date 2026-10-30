@@ -2,9 +2,12 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { posRepo } from "@/lib/pos-repo";
 import { effectiveHasFeature } from "@/lib/modules";
+import { siteAllows } from "@/lib/site-features";
+import { useSiteStore } from "@/store/site";
 import type { PosFeature } from "@/lib/verticals";
 import { useBusinessStore } from "@/store/business";
 import { PageHeader } from "@zatgo/ui";
+import { money } from "@/lib/money";
 
 type Card = {
   key: string;
@@ -35,6 +38,7 @@ const allCards: Card[] = [
 export function DashboardPage() {
   const profile = useBusinessStore((s) => s.profile);
   const modules = useBusinessStore((s) => s.modules);
+  const site = useSiteStore((s) => s.profile);
   const verticalId = useBusinessStore((s) => s.verticalId);
   const { data } = useQuery({
     queryKey: ["pos", "counts", verticalId],
@@ -42,7 +46,7 @@ export function DashboardPage() {
   });
 
   const cards = allCards.filter(
-    (c) => !c.feature || effectiveHasFeature(profile, c.feature, modules),
+    (c) => !c.feature || effectiveHasFeature(profile, c.feature, modules) && siteAllows(site, c.feature),
   );
 
   return (
@@ -67,7 +71,7 @@ export function DashboardPage() {
             raw == null
               ? "—"
               : card.format === "money"
-                ? `$${Number(raw).toFixed(2)}`
+                ? `${money(Number(raw))}`
                 : String(raw);
           return (
             <Link

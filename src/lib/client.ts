@@ -1,4 +1,5 @@
 import { erpnextPing } from "@zatgo/erpnext";
+import { useSiteStore } from "@/store/site";
 import { useSessionStore } from "@/store/session";
 
 export type LoginResult =
@@ -40,7 +41,6 @@ export async function loginWithPassword(input: {
     baseUrl: result.baseUrl,
     error: null,
   });
-  useSessionStore.getState().setAllowMockWithoutLogin(false);
 
   return result;
 }
@@ -50,7 +50,7 @@ export async function logoutFromErpnext(): Promise<void> {
     await window.zatgoDesktop.erpnextLogout();
   }
   useSessionStore.getState().clearSession();
-  useSessionStore.getState().setAllowMockWithoutLogin(false);
+  useSiteStore.getState().reset();
 }
 
 /** Restore renderer session flag if Electron main still has cookies (hot reload). */
@@ -82,17 +82,27 @@ export async function erpnextApi<T = unknown>(
   const path = methodPath.startsWith("/api/")
     ? methodPath
     : `/api/method/${methodPath}`;
-  const res = await window.zatgoDesktop.erpnextRequest({
-    path,
-    method: "POST",
-    headers: { "Content-Type": "application/json", Accept: "application/json" },
-    body: JSON.stringify(args),
-  });
+  let res: Awaited<ReturnType<NonNullable<typeof window.zatgoDesktop>["erpnextRequest"]>>;
+  try {
+    res = await window.zatgoDesktop.erpnextRequest({
+      path,
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify(args),
+    });
+  } catch {
+    throw new Error("Cannot reach the server. ZatGo POS works online only — check your connection.");
+  }
   const json = JSON.parse(res.bodyText || "{}") as {
     message?: T | string;
     exception?: string;
     _server_messages?: string;
   };
+  if (res.status === 404 && /\/zatgo_core\.api\.v1\.resto_pos\./.test(path)) {
+    throw new Error(
+      "Restaurant POS is switched off on this site (or zatgo-core is outdated). Enable Restaurant in ZG System Settings → Industries.",
+    );
+  }
   if (!res.ok) {
     let detail =
       typeof json.message === "string"

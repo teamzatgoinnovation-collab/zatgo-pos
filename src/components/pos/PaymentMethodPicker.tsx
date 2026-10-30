@@ -20,20 +20,20 @@ export function PaymentMethodPicker({
   onChange: (method: PaymentMethod) => void;
 }) {
   return (
-    <div className="grid grid-cols-3 gap-1.5">
+    <div className="grid grid-cols-3 gap-1">
       {OPTIONS.map(({ value: option, label, icon: Icon }) => (
         <button
           key={option}
           type="button"
           onClick={() => onChange(option)}
           className={cn(
-            "flex flex-col items-center gap-1 rounded-[var(--radius-lg)] border px-2 py-2.5 text-xs font-medium transition-colors",
+            "flex h-8 items-center justify-center gap-1.5 rounded-[var(--radius-lg)] border text-xs font-medium transition-colors",
             value === option
               ? "border-[var(--color-primary)] bg-[var(--pos-sidebar-active)] text-[var(--color-foreground)]"
               : "border-[var(--color-border)] text-[var(--color-muted-foreground)] hover:bg-[var(--color-muted)]",
           )}
         >
-          <Icon className="size-4" />
+          <Icon className="size-3.5" />
           {label}
         </button>
       ))}

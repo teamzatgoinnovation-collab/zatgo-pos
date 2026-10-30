@@ -24,11 +24,26 @@ import type { PaymentMethod } from "@/store/cart";
 
 export type * from "@/lib/pos-models";
 
-const NOT_READY = "ERPNext domain methods are not available yet for this action.";
-
 function asRows(data: unknown): Record<string, unknown>[] {
   if (Array.isArray(data)) return data as Record<string, unknown>[];
   return [];
+}
+
+/** Walk every page of a paginated zatgo-core list (the API caps page_size at 100). */
+async function fetchAllRows(
+  method: string,
+  args: Record<string, unknown> = {},
+  maxPages = 30,
+): Promise<Record<string, unknown>[]> {
+  const out: Record<string, unknown>[] = [];
+  for (let page = 1; page <= maxPages; page++) {
+    const env = await callZatGoApi<unknown[]>(method, { ...args, page, page_size: 100 });
+    const rows = asRows(env.data);
+    out.push(...rows);
+    const total = Number(env.meta?.total ?? 0);
+    if (rows.length < 100 || (total && out.length >= total)) break;
+  }
+  return out;
 }
 
 function isAvailable(value: unknown): boolean {
@@ -208,6 +223,15 @@ function mapOrder(row: Record<string, unknown>): OrderRecord {
   };
 }
 
+function mapCustomer(row: Record<string, unknown>): CustomerRecord {
+  return {
+    id: String(row.id ?? row.name ?? ""),
+    name: String(row.name ?? row.customer_name ?? ""),
+    phone: row.phone ? String(row.phone) : undefined,
+    email: row.email ? String(row.email) : undefined,
+  };
+}
+
 function mapTable(row: Record<string, unknown>): TableRecord {
   return {
     id: String(row.id ?? row.table_code ?? row.name ?? ""),
@@ -241,10 +265,6 @@ function boyStatusRank(status?: string): number {
   return 2;
 }
 
-function notReady<T>(): Promise<T> {
-  return Promise.reject(new Error(NOT_READY));
-}
-
 export type PosCounts = {
   freeTables: number;
   occupiedTables: number;
@@ -262,7 +282,7 @@ export type PosCounts = {
 
 /**
  * ERPNext / zatgo_core POS repository.
- * Live methods call Frappe whitelists; unavailable domains reject (no local seed).
+ * Every method calls a zatgo-core whitelist; the POS is online-only (no local seed, no offline queue).
  */
 export const posRepo = {
   orderTotal(order: OrderRecord) {
@@ -270,34 +290,34 @@ export const posRepo = {
   },
 
   async counts(_verticalId?: VerticalId): Promise<PosCounts> {
-    const env = await callZatGoApi<{
-      items?: number;
-      kds_open?: number;
-    }>(ZatGoApi.restoPos.status);
-    const items = Number(env.data?.items ?? env.meta?.items ?? 0);
-    const kdsOpen = Number(env.data?.kds_open ?? env.meta?.kds_open ?? 0);
+    const [status, dash] = await Promise.all([
+      callZatGoApi<{ items?: number; kds_open?: number }>(ZatGoApi.restoPos.status),
+      callZatGoApi<Record<string, unknown>>(ZatGoApi.restoPos.dashboardCounts),
+    ]);
+    const items = Number(status.data?.items ?? status.meta?.items ?? 0);
+    const kdsOpen = Number(status.data?.kds_open ?? status.meta?.kds_open ?? 0);
+    const d = dash.data ?? {};
+    const occupied = Number(d.occupiedTables ?? 0);
+    const revenue = Number(d.revenueToday ?? 0);
     return {
-      freeTables: 0,
-      occupiedTables: 0,
-      openOrders: 0,
+      freeTables: Number(d.freeTables ?? 0),
+      occupiedTables: occupied,
+      openOrders: Number(d.openOrders ?? 0),
       kdsTickets: kdsOpen,
       catalogItems: items,
-      lowStock: 0,
-      todaySales: 0,
+      lowStock: Number(d.lowStock ?? 0),
+      todaySales: Number(d.todaySales ?? revenue),
       products: items,
-      tablesOccupied: 0,
+      tablesOccupied: occupied,
       kdsQueued: kdsOpen,
-      paymentsToday: 0,
-      revenueToday: 0,
+      paymentsToday: Number(d.paymentsToday ?? 0),
+      revenueToday: revenue,
     };
   },
 
   async listProducts(_verticalId?: VerticalId): Promise<ProductRecord[]> {
-    const env = await callZatGoApi<unknown[]>(ZatGoApi.restoPos.catalogList, {
-      page: 1,
-      page_size: 100,
-    });
-    return asRows(env.data).map(mapProduct).filter((p) => p.id);
+    const rows = await fetchAllRows(ZatGoApi.restoPos.catalogList);
+    return rows.map(mapProduct).filter((p) => p.id);
   },
 
   async listMenu(verticalId?: VerticalId): Promise<ProductRecord[]> {
@@ -327,8 +347,13 @@ export const posRepo = {
     return asRows(env.data).map(mapTable).filter((t) => t.id);
   },
 
-  async listCustomers(): Promise<CustomerRecord[]> {
-    return [];
+  async listCustomers(search?: string): Promise<CustomerRecord[]> {
+    const env = await callZatGoApi<unknown[]>(ZatGoApi.restoPos.customersList, {
+      search: search?.trim() || undefined,
+      page: 1,
+      page_size: 100,
+    });
+    return asRows(env.data).map(mapCustomer).filter((c) => c.id);
   },
 
   async listDeliveryBoys(opts?: {
@@ -400,39 +425,96 @@ export const posRepo = {
       .filter((t) => t.id && t.status !== "served");
   },
 
-  async listPayments(): Promise<PaymentRecord[]> {
-    return [];
+  async listPayments(date?: string): Promise<PaymentRecord[]> {
+    const env = await callZatGoApi<unknown[]>(ZatGoApi.restoPos.paymentsList, {
+      date,
+      page: 1,
+      page_size: 200,
+    });
+    return asRows(env.data).map(mapPayment).filter((p) => p.id);
   },
 
   async listInventory(_verticalId?: VerticalId): Promise<InventoryRecord[]> {
-    return [];
+    const rows = await fetchAllRows(ZatGoApi.restoPos.stockList);
+    return rows.map((r) => ({
+      id: String(r.id ?? ""),
+      name: String(r.name ?? r.id ?? ""),
+      unit: String(r.unit ?? "Nos"),
+      onHand: Number(r.onHand ?? 0),
+      reorderAt: Number(r.reorderAt ?? 0),
+      category: String(r.category ?? ""),
+      verticals: [],
+    }));
   },
 
-  async findByBarcode(code: string, verticalId?: VerticalId): Promise<ProductRecord | null> {
-    const products = await this.listProducts(verticalId);
-    return products.find((p) => p.barcode === code) ?? null;
+  async findByBarcode(code: string, _verticalId?: VerticalId): Promise<ProductRecord | null> {
+    const env = await callZatGoApi<Record<string, unknown> | null>(
+      ZatGoApi.restoPos.catalogByBarcode,
+      { code },
+    );
+    return env.data ? mapProduct(env.data) : null;
   },
 
   async upsertMenuItem(
-    _input: Partial<ProductRecord> & { name: string; price: number },
+    input: Partial<ProductRecord> & { name: string; price: number },
   ): Promise<ProductRecord> {
-    return notReady();
+    const env = await callZatGoApi<Record<string, unknown>>(ZatGoApi.restoPos.catalogUpsert, {
+      item_code: input.id || undefined,
+      item_name: input.name,
+      price: input.price,
+      item_group: input.category || undefined,
+      barcode: input.barcode || undefined,
+      uom: input.unit || undefined,
+      enabled: input.available === undefined ? undefined : input.available ? 1 : 0,
+    });
+    return mapProduct(env.data ?? {});
   },
 
-  async deleteMenuItem(_id: string): Promise<void> {
-    return notReady();
+  async deleteMenuItem(id: string): Promise<void> {
+    await callZatGoApi(ZatGoApi.restoPos.catalogDisable, { item_code: id });
   },
 
+  /** Creates the Item when new, then moves stock to `onHand` with a real Stock Entry. */
   async upsertInventory(
-    _input: Partial<InventoryRecord> & { name: string },
+    input: Partial<InventoryRecord> & { name: string },
   ): Promise<InventoryRecord> {
-    return notReady();
+    let id = input.id;
+    if (!id) {
+      const created = await callZatGoApi<Record<string, unknown>>(ZatGoApi.restoPos.catalogUpsert, {
+        item_name: input.name,
+        uom: input.unit || undefined,
+      });
+      id = String(created.data?.id ?? created.data?.item_code ?? created.data?.name ?? "");
+      if (!id) throw new Error("Could not create the item");
+    }
+    const rows = await this.listInventory();
+    const current = rows.find((r) => r.id === id)?.onHand ?? 0;
+    const target = input.onHand ?? current;
+    const delta = target - current;
+    if (delta !== 0) {
+      await callZatGoApi(ZatGoApi.restoPos.stockAdjust, {
+        item_code: id,
+        qty: delta,
+        client_id: crypto.randomUUID(),
+        reason: "Stock set from ZatGo POS",
+      });
+    }
+    const after = (await this.listInventory()).find((r) => r.id === id);
+    if (!after) throw new Error("Item not found after saving");
+    return after;
   },
 
   async upsertCustomer(
-    _input: Partial<CustomerRecord> & { name: string },
+    input: Partial<CustomerRecord> & { name: string },
   ): Promise<CustomerRecord> {
-    return notReady();
+    const env = await callZatGoApi<Record<string, unknown>>(ZatGoApi.restoPos.customersUpsert, {
+      customer_id: input.id || undefined,
+      customer_name: input.name,
+      phone: input.phone,
+      email: input.email,
+      client_id: input.id ? undefined : crypto.randomUUID(),
+    });
+    return mapCustomer(env.data ?? {});
   },
 
   async sendOrder(orderId: string): Promise<OrderRecord> {
@@ -603,7 +685,7 @@ export const posRepo = {
     }[],
     method: PaymentMethod,
     _verticalId: VerticalId,
-    _pricing: { amount: number; discount: number; tax: number },
+    pricing: { amount: number; discount: number; tax: number },
     meta: CheckoutMeta,
   ): Promise<{ order: OrderRecord; payment: PaymentRecord }> {
     if (!lines.length) {
@@ -637,7 +719,14 @@ export const posRepo = {
 
     const payEnv = await callZatGoApi<{ order: Record<string, unknown>; payment: Record<string, unknown> }>(
       ZatGoApi.restoPos.billingPay,
-      { order_id: orderId, method, client_id: clientId },
+      {
+        order_id: orderId,
+        method,
+        client_id: clientId,
+        // The discount is posted on the Sales Invoice; tax comes from the site's template.
+        discount_type: pricing.discount > 0 ? "fixed" : undefined,
+        discount_value: pricing.discount > 0 ? Number(pricing.discount.toFixed(2)) : undefined,
+      },
     );
     let order = mapOrder(payEnv.data?.order ?? {});
     const payment = mapPayment(payEnv.data?.payment ?? {});

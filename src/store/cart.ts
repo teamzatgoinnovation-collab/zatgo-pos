@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { useSiteStore } from "@/store/site";
 import type {
   CheckoutMeta,
   CustomerRecord,
@@ -57,7 +58,7 @@ export type CartPricing = {
   itemCount: number;
 };
 
-const DEFAULT_TAX_RATE = 0.1;
+const DEFAULT_TAX_RATE = 0;
 
 export const emptyInvoiceMeta = (): CartInvoiceMeta => ({
   saleType: "counter",
@@ -193,13 +194,16 @@ export function cartPricing(
   const subtotal = cartSubtotal(lines);
   const discount = discountAmount(subtotal, discountType, discountValue);
   const taxable = Math.max(0, subtotal - discount);
-  const tax = taxable * Math.max(0, taxRate);
+  const rate = Math.max(0, taxRate);
+  // The site decides whether prices already include tax (company Sales Taxes template).
+  const inclusive = useSiteStore.getState().profile?.taxInclusive ?? false;
+  const tax = inclusive ? taxable - taxable / (1 + rate) : taxable * rate;
   return {
     subtotal,
     discount,
     taxable,
     tax,
-    total: taxable + tax,
+    total: inclusive ? taxable : taxable + tax,
     itemCount: cartItemCount(lines),
   };
 }

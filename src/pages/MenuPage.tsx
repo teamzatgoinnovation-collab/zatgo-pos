@@ -10,6 +10,7 @@ import { posRepo, type ProductRecord } from "@/lib/pos-repo";
 import { useHasFeature } from "@/hooks/useHasFeature";
 import { hasFeature } from "@/lib/verticals";
 import { useBusinessStore } from "@/store/business";
+import { money } from "@/lib/money";
 
 const schema = z.object({
   name: z.string().min(1, "Required"),
@@ -94,7 +95,7 @@ export function MenuPage() {
       {
         accessorKey: "price",
         header: "Price",
-        cell: ({ row }) => `$${row.original.price.toFixed(2)}`,
+        cell: ({ row }) => `${money(row.original.price)}`,
       },
       {
         id: "flags",

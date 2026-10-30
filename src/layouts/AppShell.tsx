@@ -25,6 +25,8 @@ import { useThemeStore } from "@/store/theme";
 import { useSessionStore } from "@/store/session";
 import { useBusinessStore } from "@/store/business";
 import { effectiveHasFeature } from "@/lib/modules";
+import { siteAllows } from "@/lib/site-features";
+import { useSiteStore } from "@/store/site";
 import type { PosFeature } from "@/lib/verticals";
 import { logoutFromErpnext } from "@/lib/client";
 import { useEffect, useMemo, useState } from "react";
@@ -45,6 +47,7 @@ export function AppShell() {
   const fullName = useSessionStore((s) => s.fullName);
   const profile = useBusinessStore((s) => s.profile);
   const modules = useBusinessStore((s) => s.modules);
+  const site = useSiteStore((s) => s.profile);
   const [version, setVersion] = useState("dev");
   const [signingOut, setSigningOut] = useState(false);
 
@@ -63,9 +66,13 @@ export function AppShell() {
       { href: "/connection", label: "Setup", icon: Settings },
     ];
     return items
-      .filter((item) => !item.feature || effectiveHasFeature(profile, item.feature, modules))
+      .filter(
+        (item) =>
+          !item.feature ||
+          (siteAllows(site, item.feature) && effectiveHasFeature(profile, item.feature, modules)),
+      )
       .map(({ feature: _feature, ...item }) => item);
-  }, [profile, modules]);
+  }, [profile, modules, site]);
 
   useEffect(() => {
     void window.zatgoDesktop?.getAppVersion().then(setVersion).catch(() => undefined);

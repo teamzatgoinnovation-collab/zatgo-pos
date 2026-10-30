@@ -87,6 +87,7 @@ export function SellPage() {
   const add = useCartStore((s) => s.add);
   const increment = useCartStore((s) => s.increment);
   const decrement = useCartStore((s) => s.decrement);
+  const setQty = useCartStore((s) => s.setQty);
   const remove = useCartStore((s) => s.remove);
   const clear = useCartStore((s) => s.clear);
   const hold = useCartStore((s) => s.hold);
@@ -476,6 +477,7 @@ export function SellPage() {
             charging={checkout.isPending}
             onIncrement={increment}
             onDecrement={decrement}
+            onSetQty={setQty}
             onRemove={remove}
             onClear={clear}
             onHold={onHold}

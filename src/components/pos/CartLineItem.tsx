@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import { cn } from "@zatgo/ui";
 import { Minus, Plus, X } from "@zatgo/icons";
 import { money } from "@/lib/money";
@@ -22,12 +23,29 @@ export function CartLineItem({
   onIncrement,
   onDecrement,
   onRemove,
+  onSetQty,
 }: {
   line: LineDisplay;
   onIncrement?: () => void;
   onDecrement?: () => void;
   onRemove?: () => void;
+  /** When given, the quantity is typed in directly (0 removes the line). */
+  onSetQty?: (qty: number) => void;
 }) {
+  const [draft, setDraft] = useState<string | null>(null);
+  const cancelled = useRef(false);
+  useEffect(() => setDraft(null), [line.qty]);
+  const commit = () => {
+    if (cancelled.current) {
+      cancelled.current = false;
+      setDraft(null);
+      return;
+    }
+    if (draft === null) return;
+    const n = Number.parseFloat(draft);
+    setDraft(null);
+    if (Number.isFinite(n) && n !== line.qty && n >= 0) onSetQty?.(n);
+  };
   const lineTotal = line.qty * line.unitPrice;
   const editable = line.editable !== false;
   const detail = [line.extras, line.meta].filter(Boolean).join(" · ");
@@ -51,7 +69,26 @@ export function CartLineItem({
           <button type="button" className={iconButton} onClick={onDecrement} aria-label="Decrease quantity">
             <Minus className="size-3.5" />
           </button>
-          <span className="min-w-5 text-center text-sm font-semibold tabular-nums">{line.qty}</span>
+          {onSetQty ? (
+            <input
+              inputMode="decimal"
+              aria-label={`Quantity of ${line.name}`}
+              value={draft ?? String(line.qty)}
+              onFocus={(e) => e.currentTarget.select()}
+              onChange={(e) => setDraft(e.target.value.replace(/[^0-9.]/g, ""))}
+              onBlur={commit}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") e.currentTarget.blur();
+                if (e.key === "Escape") {
+                  cancelled.current = true;
+                  e.currentTarget.blur();
+                }
+              }}
+              className="h-7 w-10 rounded-[var(--radius-lg)] border border-transparent bg-transparent px-0 text-center text-sm font-semibold tabular-nums outline-none hover:border-[var(--color-border)] focus:border-[var(--color-primary)]"
+            />
+          ) : (
+            <span className="min-w-5 text-center text-sm font-semibold tabular-nums">{line.qty}</span>
+          )}
           <button type="button" className={iconButton} onClick={onIncrement} aria-label="Increase quantity">
             <Plus className="size-3.5" />
           </button>

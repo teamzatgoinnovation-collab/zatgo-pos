@@ -29,6 +29,7 @@ export function CartPanel({
   onIncrement,
   onDecrement,
   onRemove,
+  onSetQty,
   onClear,
   onHold,
   onMethodChange,
@@ -50,6 +51,7 @@ export function CartPanel({
   onIncrement: (lineId: string) => void;
   onDecrement: (lineId: string) => void;
   onRemove: (lineId: string) => void;
+  onSetQty: (lineId: string, qty: number) => void;
   onClear: () => void;
   onHold: () => void;
   onMethodChange: (method: PaymentMethod) => void;
@@ -137,6 +139,7 @@ export function CartPanel({
               onIncrement={() => onIncrement(line.lineId)}
               onDecrement={() => onDecrement(line.lineId)}
               onRemove={() => onRemove(line.lineId)}
+              onSetQty={(qty) => onSetQty(line.lineId, qty)}
             />
           ))
         )}

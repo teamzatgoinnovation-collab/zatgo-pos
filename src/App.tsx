@@ -17,12 +17,15 @@ import { OrdersPage } from "@/pages/OrdersPage";
 import { ReportsPage } from "@/pages/ReportsPage";
 import { SellPage } from "@/pages/SellPage";
 import { useSessionStore } from "@/store/session";
+import { bootOffline } from "@/lib/offline/boot";
 
 const Router = window.zatgoDesktop ? HashRouter : BrowserRouter;
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const connected = useSessionStore((s) => s.connected);
-  if (!connected) {
+  // A device-PIN unlock opens the POS from the saved snapshot; selling is queued until a real login.
+  const unlocked = useSessionStore((s) => s.offlineUnlocked);
+  if (!connected && !unlocked) {
     return <Navigate to="/login" replace />;
   }
   return children;
@@ -94,7 +97,7 @@ function AppRoutes() {
         <Route
           path="delivery-boys"
           element={
-            <RequireFeature feature="sell" fallback="/dashboard">
+            <RequireFeature feature="delivery" fallback="/dashboard">
               <DeliveryBoysPage />
             </RequireFeature>
           }
@@ -126,7 +129,9 @@ export function App() {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    void hydrateErpnextSession().finally(() => setReady(true));
+    void hydrateErpnextSession()
+      .finally(() => setReady(true))
+      .then(() => bootOffline());
   }, []);
 
   if (!ready) {

@@ -4,8 +4,11 @@ import type { ColumnDef } from "@tanstack/react-table";
 import { posRepo, type PaymentRecord } from "@/lib/pos-repo";
 import { PageHeader, DataTable } from "@zatgo/ui";
 import { money } from "@/lib/money";
+import { useSiteStore } from "@/store/site";
+import { isRetailSite } from "@/lib/site-features";
 
 export function ReportsPage() {
+  const retail = useSiteStore((s) => isRetailSite(s.profile));
   const { data: payments = [] } = useQuery({
     queryKey: ["pos", "payments"],
     queryFn: () => posRepo.listPayments(),
@@ -50,7 +53,11 @@ export function ReportsPage() {
         <Stat label="Payments" value={String(payments.length)} />
         <Stat label="Cash" value={`${money(byMethod.cash)}`} />
         <Stat label="Card" value={`${money(byMethod.card)}`} />
-        <Stat label="Open tickets" value={String(counts?.openOrders ?? "—")} />
+        {retail ? (
+          <Stat label="Items sold today" value={String(counts?.itemsSoldToday ?? "—")} />
+        ) : (
+          <Stat label="Open tickets" value={String(counts?.openOrders ?? "—")} />
+        )}
       </div>
 
       <DataTable data={payments} columns={columns} emptyMessage="No settled checks yet" />

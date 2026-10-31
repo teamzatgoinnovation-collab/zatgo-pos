@@ -1,10 +1,40 @@
-import { app, BrowserWindow, ipcMain } from "electron";
+import { app, BrowserWindow, ipcMain, net, safeStorage } from "electron";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { ErpnextSessionStore } from "@zatgo/erpnext";
+import { Heartbeat } from "./heartbeat";
+import { OfflineStore } from "./offline-store";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const erpnext = new ErpnextSessionStore();
+
+// POS offline: the one place a local queue is allowed (see desktop/CLAUDE.md). Files live in userData/offline.
+const offlineStore = new OfflineStore(path.join(app.getPath("userData"), "offline"), {
+  available: () => safeStorage.isEncryptionAvailable(),
+  encrypt: (plain) => safeStorage.encryptString(plain),
+  decrypt: (data) => safeStorage.decryptString(data),
+});
+let configuredSite: string | null = null;
+const heartbeat = new Heartbeat({
+  getBaseUrl: () => erpnext.get()?.baseUrl ?? configuredSite,
+  isNetOnline: () => net.isOnline(),
+  fetchFn: (url, init) => fetch(url, { method: "GET", headers: { Accept: "application/json" }, signal: init.signal }),
+  emit: (state) => {
+    for (const win of BrowserWindow.getAllWindows()) win.webContents.send("offline:status", state);
+  },
+});
+
+/** A 401, or a 403 where the session turned out to be Guest, means the cookie is gone: the queue needs a re-login. */
+async function sessionIsLost(): Promise<boolean> {
+  try {
+    const res = await erpnext.request({ path: "/api/method/frappe.auth.get_logged_user", method: "GET" });
+    if (res.status === 401 || res.status === 403) return true;
+    const body = JSON.parse(res.bodyText || "{}") as { message?: string };
+    return !body.message || body.message === "Guest";
+  } catch {
+    return false;
+  }
+}
 
 process.env.DIST = path.join(__dirname, "../dist");
 process.env.VITE_PUBLIC = app.isPackaged
@@ -136,6 +166,9 @@ ipcMain.handle(
   async (_event, payload: { baseUrl: string; usr: string; pwd: string }) => {
     const result = await erpnext.login(payload);
     if (!result.ok) return result;
+    configuredSite = result.session.baseUrl;
+    heartbeat.setAuthExpired(false);
+    void heartbeat.check();
     return {
       ok: true as const,
       user: result.session.user,
@@ -147,6 +180,7 @@ ipcMain.handle(
 
 ipcMain.handle("erpnext:logout", async () => {
   await erpnext.logout();
+  heartbeat.setAuthExpired(false);
   return { ok: true as const };
 });
 
@@ -166,11 +200,51 @@ ipcMain.handle(
       body?: string | null;
       headers?: Record<string, string>;
     },
-  ) => erpnext.request(payload),
+  ) => {
+    let res: Awaited<ReturnType<typeof erpnext.request>>;
+    try {
+      res = await erpnext.request(payload);
+    } catch (err) {
+      heartbeat.reportNetworkFailure();
+      throw err;
+    }
+    heartbeat.reportReachable();
+    if (res.status === 401) heartbeat.setAuthExpired(true);
+    else if (res.status === 403) heartbeat.setAuthExpired(await sessionIsLost());
+    else if (res.ok) heartbeat.setAuthExpired(false);
+    return res;
+  },
 );
+
+// ---- POS offline IPC (no secrets cross it: cookies and passwords never reach the store) ----
+ipcMain.handle("offline:deviceInfo", () => offlineStore.deviceInfo());
+ipcMain.handle("offline:nextReceiptSeq", () => offlineStore.nextReceiptSeq());
+ipcMain.handle("offline:outboxList", () => offlineStore.outboxList());
+ipcMain.handle("offline:outboxAdd", (_e, row) => offlineStore.outboxAdd(row));
+ipcMain.handle("offline:outboxUpdate", (_e, id: string, patch: Record<string, unknown>) =>
+  offlineStore.outboxUpdate(id, patch),
+);
+ipcMain.handle("offline:outboxRemove", (_e, id: string) => offlineStore.outboxRemove(id));
+ipcMain.handle("offline:snapshotGet", (_e, name: string) => offlineStore.snapshotGet(name));
+ipcMain.handle("offline:snapshotSet", (_e, name: string, value: unknown) => offlineStore.snapshotSet(name, value));
+ipcMain.handle("offline:pinSet", (_e, input) => offlineStore.pinSet(input));
+ipcMain.handle("offline:pinVerify", (_e, input) => offlineStore.pinVerify(input));
+ipcMain.handle("offline:pinUsers", (_e, scope: string) => offlineStore.pinUsers(scope));
+ipcMain.handle("offline:pinClear", (_e, scope: string, user: string) => offlineStore.pinClear(scope, user));
+ipcMain.handle("offline:getStatus", () => heartbeat.state());
+ipcMain.handle("offline:checkNow", () => heartbeat.check());
+ipcMain.handle("offline:setSite", (_e, baseUrl: string | null) => {
+  configuredSite = baseUrl ? String(baseUrl).trim().replace(/\/$/, "") : null;
+  void heartbeat.check();
+});
+ipcMain.handle("offline:probeAuth", async () => {
+  if (!erpnext.get()) return { authenticated: false };
+  return { authenticated: !(await sessionIsLost()) };
+});
 
 app.whenReady().then(() => {
   createWindow();
+  heartbeat.start();
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) {

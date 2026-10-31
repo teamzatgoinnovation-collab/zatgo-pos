@@ -8,12 +8,14 @@ export function BarcodeScanField({
   onSubmit,
   inputRef,
   className,
+  autoFocus,
 }: {
   value: string;
   onChange: (value: string) => void;
   onSubmit: (e: FormEvent) => void;
   inputRef: RefObject<HTMLInputElement | null>;
   className?: string;
+  autoFocus?: boolean;
 }) {
   return (
     <form
@@ -31,6 +33,7 @@ export function BarcodeScanField({
         placeholder="Scan barcode or type SKU / name…"
         className="h-12 min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-[var(--color-muted-foreground)]"
         autoComplete="off"
+        autoFocus={autoFocus}
       />
       <Button type="submit" className="h-9 shrink-0 px-4">
         Add

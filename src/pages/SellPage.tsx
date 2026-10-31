@@ -42,6 +42,8 @@ import { useHasFeature } from "@/hooks/useHasFeature";
 import { usePosOrderActions, usePosKdsActions, usePosTableActions } from "@/hooks/usePosActions";
 import { hasFeature } from "@/lib/verticals";
 import { useBusinessStore } from "@/store/business";
+import { useSiteStore } from "@/store/site";
+import { isRetailSite } from "@/lib/site-features";
 import {
   cartPricing,
   invoiceMetaToCheckout,
@@ -51,6 +53,9 @@ import {
 import { useLastSaleStore } from "@/store/last-sale";
 import { usePrinterStore } from "@/store/printer";
 import { money } from "@/lib/money";
+import { discountViolation } from "@/lib/offline/limits";
+import { useConnectivity } from "@/lib/offline/connectivity";
+import { usePosSettings } from "@/lib/offline/settings";
 
 export function SellPage() {
   const profile = useBusinessStore((s) => s.profile);
@@ -58,6 +63,8 @@ export function SellPage() {
   const showOrders = useHasFeature("orders");
   const showKds = useHasFeature("kds");
   const showFloor = useHasFeature("floor");
+  const showDelivery = useHasFeature("delivery");
+  const retail = useSiteStore((s) => isRetailSite(s.profile));
   const qc = useQueryClient();
   const [scan, setScan] = useState("");
   const [category, setCategory] = useState<string>("all");
@@ -187,6 +194,10 @@ export function SellPage() {
     if (product.requiresPrescription && hasFeature(profile, "prescriptions")) {
       toast.message("Prescription item — confirm Rx on hand before handing over.");
     }
+    // Offline policy is "sell and flag": a zero in the cached stock is a warning, never a block.
+    if (useConnectivity.getState().net !== "online" && product.stockQty !== undefined && product.stockQty <= 0) {
+      toast.warning(`${product.name}: saved stock shows ${product.stockQty}. The sale will be flagged for review.`);
+    }
     add(product, extras);
   };
 
@@ -245,6 +256,9 @@ export function SellPage() {
       if (metaError) {
         throw new Error(metaError);
       }
+      const policy = usePosSettings.getState().settings;
+      const discountError = discountViolation(policy, pricing.subtotal, pricing.discount);
+      if (discountError) throw new Error(discountError);
       const tendered = Number.parseFloat(cashTendered);
       return posRepo
         .checkoutWalkIn(
@@ -268,15 +282,18 @@ export function SellPage() {
         .then((result) => ({
           ...result,
           cashTendered: Number.isFinite(tendered) ? tendered : undefined,
-          pricingSnapshot: { ...pricing },
+          // Retail: the invoice's own posted figures; restaurant: the cart pricing (unchanged).
+          pricingSnapshot: result.pricing ? { ...pricing, ...result.pricing } : { ...pricing },
         }));
     },
-    onSuccess: ({ order: saleOrder, payment, cashTendered: tendered, pricingSnapshot }) => {
+    onSuccess: ({ order: saleOrder, payment, cashTendered: tendered, pricingSnapshot, pendingSync }) => {
       // Keep this sync — TanStack Query awaits onSuccess before clearing isPending.
       invalidate();
       setInvoiceOpen(false);
       toast.success(
-        saleOrder.channel === "delivery" && saleOrder.delivery?.deliveryBoyName
+        pendingSync
+          ? `Saved offline · ${pendingSync.ref} · ${money(payment.amount)} — it will sync when the connection is back`
+          : saleOrder.channel === "delivery" && saleOrder.delivery?.deliveryBoyName
           ? `Invoice #${payment.orderNumber} · ${money(payment.amount)} → ${saleOrder.delivery.deliveryBoyName}`
           : `Invoice #${payment.orderNumber} · ${money(payment.amount)}`,
       );
@@ -293,6 +310,7 @@ export function SellPage() {
           total: pricingSnapshot.total,
         },
         cashTendered: tendered,
+        pendingSyncRef: pendingSync?.ref,
       });
       presentSale(doc);
       scanRef.current?.focus();
@@ -334,6 +352,8 @@ export function SellPage() {
           profile,
           order: paidOrder,
           payment,
+          pricing: posRepo.salePricing(payment.orderId) ?? undefined,
+          pendingSyncRef: posRepo.pendingSyncRef(payment.orderId) ?? undefined,
         }),
       );
     } catch (err) {
@@ -367,7 +387,7 @@ export function SellPage() {
       setHub(null);
     }
     scanRef.current?.focus();
-  }, [verticalId, clear]);
+  }, [verticalId, clear, retail]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -394,10 +414,12 @@ export function SellPage() {
     setPreview({
       ...preview,
       kind,
-      subtitle: kind === "invoice" ? "Tax invoice / guest check" : "Sales receipt",
+      subtitle: kind === "invoice" ? (retail ? "Tax invoice" : "Tax invoice / guest check") : "Sales receipt",
       footerNote:
         kind === "invoice"
-          ? "Thank you for dining with us. Please retain this invoice."
+          ? retail
+            ? "Thank you for your purchase. Please retain this invoice."
+            : "Thank you for dining with us. Please retain this invoice."
           : "Thank you for your purchase.",
     });
   };
@@ -453,6 +475,7 @@ export function SellPage() {
             onChange={setScan}
             onSubmit={(e) => void onScanSubmit(e)}
             inputRef={scanRef}
+            autoFocus={retail}
           />
           <CategoryChips
             categories={categories}
@@ -474,6 +497,7 @@ export function SellPage() {
             taxRate={taxRate}
             invoice={invoice}
             showTable={showFloor}
+            showDelivery={showDelivery}
             charging={checkout.isPending}
             onIncrement={increment}
             onDecrement={decrement}
@@ -497,6 +521,7 @@ export function SellPage() {
         customers={customers}
         tables={tables}
         showTable={showFloor}
+        showDelivery={showDelivery}
         total={pricing.total}
         busy={checkout.isPending}
         onClose={() => setInvoiceOpen(false)}
@@ -519,6 +544,7 @@ export function SellPage() {
         open={hub === "invoices"}
         payments={payments}
         onClose={() => setHub(null)}
+        canOpen={(p) => posRepo.canReopen(p.orderId)}
         onViewReceipt={(p) => void openPaymentDoc(p, "receipt")}
         onViewInvoice={(p) => void openPaymentDoc(p, "invoice")}
       />

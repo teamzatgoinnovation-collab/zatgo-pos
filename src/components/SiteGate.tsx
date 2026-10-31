@@ -3,7 +3,7 @@ import { Button } from "@zatgo/ui";
 import { useCartStore } from "@/store/cart";
 import { useSiteStore } from "@/store/site";
 
-/** Online-only: the POS needs the site's profile before it shows anything. */
+/** The POS needs the site's profile before it shows anything: from the site, or from the saved copy when offline. */
 export function SiteGate({ children }: { children: ReactNode }) {
   const status = useSiteStore((s) => s.status);
   const profile = useSiteStore((s) => s.profile);
@@ -27,17 +27,20 @@ export function SiteGate({ children }: { children: ReactNode }) {
       <div className="mx-auto max-w-md space-y-3 p-6 text-sm">
         <p className="font-medium">Could not reach the site</p>
         <p className="text-[var(--color-muted-foreground)]">{error}</p>
+        <p className="text-xs text-[var(--color-muted-foreground)]">
+          Nothing is saved on this device yet. Connect once so the POS can keep its data for offline use.
+        </p>
         <Button onClick={() => void load()}>Retry</Button>
       </div>
     );
   }
-  if (!profile?.restaurant) {
+  if (!profile?.restaurant && !profile?.retail) {
     return (
       <div className="mx-auto max-w-md space-y-3 p-6 text-sm">
-        <p className="font-medium">Restaurant POS is off on this site</p>
+        <p className="font-medium">POS is off on this site</p>
         <p className="text-[var(--color-muted-foreground)]">
-          Ask an administrator to enable <strong>Restaurant</strong> under ZG System Settings →
-          Industries, then retry.
+          Ask an administrator to enable <strong>Restaurant</strong> or <strong>Supermarket</strong>{" "}
+          under ZG System Settings → Industries, then retry.
         </p>
         <Button onClick={() => void load()}>Retry</Button>
       </div>

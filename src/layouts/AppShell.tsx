@@ -31,6 +31,12 @@ import type { PosFeature } from "@/lib/verticals";
 import { logoutFromErpnext } from "@/lib/client";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import { OfflineBanner } from "@/components/offline/OfflineBanner";
+import { DevicePinDialog } from "@/components/offline/DevicePinDialog";
+import { offlineBridge } from "@/lib/offline/bridge";
+import { pendingCount } from "@/lib/offline/outbox-state";
+import { useOutbox } from "@/lib/offline/outbox";
+import { currentScope } from "@/lib/offline/snapshot";
 
 type PosNavItem = AppShellNavItem & { feature?: PosFeature };
 
@@ -50,6 +56,7 @@ export function AppShell() {
   const site = useSiteStore((s) => s.profile);
   const [version, setVersion] = useState("dev");
   const [signingOut, setSigningOut] = useState(false);
+  const [pinOpen, setPinOpen] = useState(false);
 
   const nav = useMemo<AppShellNavItem[]>(() => {
     const items: PosNavItem[] = [
@@ -60,7 +67,7 @@ export function AppShell() {
       { href: "/kds", label: "KDS", icon: CookingPot, feature: "kds" },
       { href: "/menu", label: profile.catalogNounPlural, icon: SquareMenu, feature: "catalog" },
       { href: "/billing", label: "Billing", icon: Receipt, feature: "billing" },
-      { href: "/delivery-boys", label: "Couriers", icon: Truck, feature: "sell" },
+      { href: "/delivery-boys", label: "Couriers", icon: Truck, feature: "delivery" },
       { href: "/inventory", label: "Inventory", icon: Package, feature: "inventory" },
       { href: "/reports", label: "Reports", icon: ChartColumn, feature: "reports" },
       { href: "/connection", label: "Setup", icon: Settings },
@@ -78,7 +85,41 @@ export function AppShell() {
     void window.zatgoDesktop?.getAppVersion().then(setVersion).catch(() => undefined);
   }, []);
 
+  // Offer a device PIN once per cashier, right after an online login (so they can reopen the POS offline).
+  useEffect(() => {
+    const bridge = offlineBridge();
+    if (!bridge || !connected || !user) return;
+    let dismissed = false;
+    try {
+      dismissed = localStorage.getItem(`zatgo_pos_pin_offer:${user}`) === "1";
+    } catch {
+      /* ignore */
+    }
+    if (dismissed) return;
+    void bridge.offlinePinUsers(currentScope()).then((users) => {
+      if (!users.some((u) => u.user.toLowerCase() === user.toLowerCase())) setPinOpen(true);
+    });
+  }, [connected, user]);
+
+  const closePin = () => {
+    setPinOpen(false);
+    try {
+      if (user) localStorage.setItem(`zatgo_pos_pin_offer:${user}`, "1");
+    } catch {
+      /* ignore */
+    }
+  };
+
   const onSignOut = async () => {
+    const waiting = pendingCount(useOutbox.getState().records);
+    if (
+      waiting > 0 &&
+      !window.confirm(
+        `${waiting} offline sale${waiting === 1 ? " is" : "s are"} still waiting to sync. They stay saved on this device and sync when ${user ?? "the cashier"} signs in again. Sign out?`,
+      )
+    ) {
+      return;
+    }
     setSigningOut(true);
     try {
       await logoutFromErpnext();
@@ -134,9 +175,9 @@ export function AppShell() {
               className="truncate font-medium text-[var(--color-foreground)]"
               title={fullName ?? user ?? undefined}
             >
-              {connected ? fullName || user : "Not signed in"}
+              {connected || user ? fullName || user : "Not signed in"}
             </p>
-            <p className="truncate">{connected ? "ERPNext" : "Not connected"}</p>
+            <p className="truncate">{connected ? "ERPNext" : user ? "Offline (device PIN)" : "Not connected"}</p>
             <p>v{version}</p>
           </>
         }
@@ -147,6 +188,11 @@ export function AppShell() {
         }
         headerActions={
           <>
+            {offlineBridge() && connected ? (
+              <Button variant="outline" size="sm" onClick={() => setPinOpen(true)}>
+                Device PIN
+              </Button>
+            ) : null}
             <Button variant="outline" size="sm" disabled={signingOut} onClick={() => void onSignOut()}>
               Sign out
             </Button>
@@ -158,14 +204,23 @@ export function AppShell() {
         }
         workspace={
           isPosWorkspace ? (
-            <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-4">
-              <Outlet />
+            <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+              <OfflineBanner />
+              <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-4">
+                <Outlet />
+              </div>
             </div>
           ) : undefined
         }
       >
-        {isPosWorkspace ? undefined : <Outlet />}
+        {isPosWorkspace ? undefined : (
+          <>
+            <OfflineBanner />
+            <Outlet />
+          </>
+        )}
       </AppShellLayout>
+      <DevicePinDialog open={pinOpen} onClose={closePin} />
     </>
   );
 }

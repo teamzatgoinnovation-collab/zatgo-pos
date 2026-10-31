@@ -36,6 +36,8 @@ export type PosDocument = {
   deliveryPhone?: string;
   deliveryBoyName?: string;
   footerNote?: string;
+  /** Offline receipt number while the site has not posted the sale yet. */
+  pendingSyncRef?: string;
 };
 
 function money(n: number) {
@@ -49,8 +51,10 @@ export function buildSaleDocument(input: {
   payment?: PaymentRecord;
   pricing?: { subtotal: number; discount: number; tax: number; total: number };
   cashTendered?: number;
+  pendingSyncRef?: string;
 }): PosDocument {
   const { order, payment, profile, kind } = input;
+  const dining = profile.id === "restaurant" || profile.id === "cafe";
   const subtotal =
     input.pricing?.subtotal ??
     order.items.reduce((n, i) => n + i.qty * i.price, 0);
@@ -66,7 +70,12 @@ export function buildSaleDocument(input: {
   return {
     kind,
     businessName: `ZatGo POS · ${profile.shortLabel}`,
-    subtitle: kind === "invoice" ? "Tax invoice / guest check" : "Sales receipt",
+    subtitle:
+      kind === "invoice"
+        ? dining
+          ? "Tax invoice / guest check"
+          : "Tax invoice"
+        : "Sales receipt",
     number: order.number,
     issuedAt: payment?.paidAt ?? order.openedAt,
     lines: order.items.map((i) => ({
@@ -92,11 +101,14 @@ export function buildSaleDocument(input: {
     deliveryAddress: order.delivery?.address,
     deliveryPhone: order.delivery?.phone,
     deliveryBoyName: order.delivery?.deliveryBoyName ?? undefined,
+    pendingSyncRef: input.pendingSyncRef,
     footerNote:
       kind === "invoice"
         ? order.channel === "delivery"
           ? "Thank you — delivery invoice. Please retain for your records."
-          : "Thank you for dining with us. Please retain this invoice."
+          : dining
+            ? "Thank you for dining with us. Please retain this invoice."
+            : "Thank you for your purchase. Please retain this invoice."
         : "Thank you for your purchase.",
   };
 }
@@ -198,6 +210,7 @@ export function documentToHtml(doc: PosDocument): string {
     .cap { text-transform: capitalize; }
     .totals div { display: flex; justify-content: space-between; gap: 12px; padding: 2px 0; }
     .grand { font-weight: 700; font-size: 1.1em; margin-top: 4px; }
+    .pending { border: 2px solid #111; text-align: center; font-weight: 700; padding: 4px; margin: 6px 0; }
     .footer { text-align: center; color: #555; margin-top: 14px; font-size: 0.9em; }
     @media print {
       body { padding: 0; }
@@ -209,6 +222,7 @@ export function documentToHtml(doc: PosDocument): string {
   <div class="sheet">
     <h1>${escapeHtml(doc.businessName)}</h1>
     ${doc.subtitle ? `<p class="sub">${escapeHtml(doc.subtitle)}</p>` : ""}
+    ${doc.pendingSyncRef ? `<p class="pending">PENDING SYNC<br />Offline receipt ${escapeHtml(doc.pendingSyncRef)}<br /><span style="font-weight:400">Provisional — the final invoice is issued when this sale syncs</span></p>` : ""}
     <p class="meta">#${escapeHtml(doc.number)} · ${escapeHtml(formatWhen(doc.issuedAt))}</p>
     ${doc.tableName ? `<p class="meta">${escapeHtml(doc.tableName)}${doc.server ? ` · ${escapeHtml(doc.server)}` : ""}${doc.channel ? ` · ${escapeHtml(doc.channel.replaceAll("_", " "))}` : ""}</p>` : ""}
     ${doc.customerName ? `<p class="meta">Customer: ${escapeHtml(doc.customerName)}${doc.customerPhone ? ` · ${escapeHtml(doc.customerPhone)}` : ""}</p>` : ""}

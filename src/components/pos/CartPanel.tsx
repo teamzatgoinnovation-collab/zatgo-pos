@@ -15,6 +15,7 @@ import { InvoiceMetaPanel } from "./InvoiceMetaPanel";
 import { PaymentMethodPicker } from "./PaymentMethodPicker";
 import { money } from "@/lib/money";
 import { useSiteStore } from "@/store/site";
+import { usePosSettings } from "@/lib/offline/settings";
 
 export function CartPanel({
   lines,
@@ -25,6 +26,7 @@ export function CartPanel({
   taxRate,
   invoice,
   showTable,
+  showDelivery = true,
   charging,
   onIncrement,
   onDecrement,
@@ -47,6 +49,7 @@ export function CartPanel({
   taxRate: number;
   invoice: CartInvoiceMeta;
   showTable: boolean;
+  showDelivery?: boolean;
   charging: boolean;
   onIncrement: (lineId: string) => void;
   onDecrement: (lineId: string) => void;
@@ -62,6 +65,15 @@ export function CartPanel({
   onCharge: () => void;
 }) {
   const pricing = cartPricing(lines, discountType, discountValue, taxRate);
+  // pos_settings: discounts can be switched off or capped (% of the subtotal); the site enforces it again.
+  const allowDiscounts = usePosSettings((s) => s.settings.allowDiscounts);
+  const maxDiscountPercent = usePosSettings((s) => s.settings.maxDiscountPercent);
+  const changeDiscount = (type: DiscountType, value: number) => {
+    if (!allowDiscounts) return onDiscountChange("none", 0);
+    const cap = maxDiscountPercent > 0 ? maxDiscountPercent : 100;
+    const max = type === "percent" ? cap : (pricing.subtotal * cap) / 100;
+    onDiscountChange(type, type === "none" ? 0 : Math.min(value, Math.max(0, max)));
+  };
   const tendered = Number.parseFloat(cashTendered);
   const change =
     method === "cash" && Number.isFinite(tendered) ? tendered - pricing.total : null;
@@ -152,6 +164,7 @@ export function CartPanel({
         <InvoiceMetaPanel
           invoice={invoice}
           showTable={showTable}
+          showDelivery={showDelivery}
           onSaleType={onSaleType}
           onOpenDetails={onEditInvoice}
         />
@@ -167,7 +180,7 @@ export function CartPanel({
             <button
               key={type}
               type="button"
-              onClick={() => onDiscountChange(type, type === "none" ? 0 : discountValue || 0)}
+              onClick={() => changeDiscount(type, type === "none" ? 0 : discountValue || 0)}
               className={cn(
                 "h-7 min-w-8 rounded-[var(--radius-lg)] border px-1.5 text-xs font-medium transition-colors",
                 discountType === type
@@ -181,16 +194,16 @@ export function CartPanel({
           ))}
           <input
             inputMode="decimal"
-            disabled={discountType === "none"}
+            disabled={discountType === "none" || !allowDiscounts}
             value={discountInput}
             onChange={(e) => {
               const raw = e.target.value;
               if (raw === "") {
-                onDiscountChange(discountType, 0);
+                changeDiscount(discountType, 0);
                 return;
               }
               const n = Number.parseFloat(raw);
-              if (Number.isFinite(n)) onDiscountChange(discountType, n);
+              if (Number.isFinite(n)) changeDiscount(discountType, n);
             }}
             placeholder="Discount"
             aria-label="Discount value"

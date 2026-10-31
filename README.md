@@ -3,10 +3,17 @@
 **Status:** Runnable multi-vertical POS (partial ERPNext wiring)  
 **Kind:** Electron + Vite + React  
 **Package:** `@zatgo/pos` · **Path:** `apps/zatgo-pos/`  
-**Backend:** `zatgo_core.api.v1.resto_pos` + `zatgo_core.api.v1.delivery` (ERPNext DocTypes)  
+**Backend:** `zatgo_core.api.v1.resto_pos` + `delivery` (Restaurant) or `zatgo_core.api.v1.retail_pos` (Supermarket)  
 **Stack:** [FRONTEND_STACK](../../Docs/Foundation/FRONTEND_STACK.md)
 
-Desktop POS for **restaurant, café, supermarket, pharmacy, electrical shops**, and general retail. Choose a business profile under **Setup** — modules and catalog adapt accordingly.
+Desktop POS that configures itself from the industry switched on in zatgo-core (ZG System Settings → Industries):
+
+| Site industry | POS mode | Profile | Backend |
+|---------------|----------|---------|---------|
+| Restaurant | `restaurant` (wins when both are on) | Restaurant: counter, floor, orders, KDS, billing, couriers | `zatgo_core.api.v1.resto_pos` + `delivery` |
+| Supermarket | `retail` | Supermarket: Counter sale with barcode scan, Products, Inventory, Reports (no floor/orders/KDS/billing/couriers) | `zatgo_core.api.v1.retail_pos` (one Sales Invoice + Payment Entry per sale) |
+
+The mode comes from `pos_profile.get` (`pos_mode`, `retail`); neither industry on shows a blocking screen. The remaining profiles in `lib/verticals.ts` (café, pharmacy, electrical, general) are not backed by a site industry yet.
 
 ## Run
 
@@ -47,3 +54,8 @@ Use **Setup** or the login screen to sign in with ERPNext email/password (Electr
 **Live via `@zatgo/erpnext` + `zatgo_core` (no local mock seed):** catalog, KDS, delivery boys (`ZG Delivery Boy` + ERPNext User role **Delivery** with username/password), assign boy on delivery checkout, delivery stop create (`ZG Delivery Stop`) on charge.
 
 **Still local/stub until resto_pos order APIs exist:** floor tables, open orders, walk-in invoice persistence, inventory CRUD, payments history.
+
+## Offline counter sales
+
+The POS keeps selling when the connection drops: sales are written to an encrypted outbox on the device (before anything is printed), receipts show `PENDING SYNC` with an `OFF-<device>-<yymmdd>-<seq>` number, and the sync worker posts them FIFO when the site is reachable and the same cashier is signed in. Needs `zatgo-core` with the offline settings enabled (ZG POS Settings -> Offline). See `../CLAUDE.md` ("POS offline") for the rules; `pnpm test` runs the unit tests.
+

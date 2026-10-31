@@ -5,18 +5,21 @@ import type { CartInvoiceMeta, SaleType } from "@/store/cart";
 export function InvoiceMetaPanel({
   invoice,
   showTable,
+  showDelivery = true,
   onSaleType,
   onOpenDetails,
 }: {
   invoice: CartInvoiceMeta;
   showTable: boolean;
+  /** Delivery sale type (restaurant only). */
+  showDelivery?: boolean;
   onSaleType: (type: SaleType) => void;
   onOpenDetails: () => void;
 }) {
   const types: { id: SaleType; label: string; hide?: boolean }[] = [
     { id: "counter", label: "Counter" },
     { id: "dine_in", label: "Table", hide: !showTable },
-    { id: "delivery", label: "Delivery" },
+    { id: "delivery", label: "Delivery", hide: !showDelivery },
   ];
 
   const summary = [

@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { posRepo } from "@/lib/pos-repo";
 import { effectiveHasFeature } from "@/lib/modules";
-import { siteAllows } from "@/lib/site-features";
+import { isRetailSite, siteAllows } from "@/lib/site-features";
 import { useSiteStore } from "@/store/site";
 import type { PosFeature } from "@/lib/verticals";
 import { useBusinessStore } from "@/store/business";
@@ -21,8 +21,11 @@ type Card = {
     | "kdsTickets"
     | "catalogItems"
     | "lowStock"
-    | "todaySales";
+    | "todaySales"
+    | "itemsSoldToday";
   format?: "money";
+  /** Only meaningful in supermarket mode (the restaurant dashboard has no such count). */
+  retailOnly?: boolean;
 };
 
 const allCards: Card[] = [
@@ -33,6 +36,7 @@ const allCards: Card[] = [
   { key: "catalog", label: "Catalog items", to: "/menu", feature: "catalog", valueKey: "catalogItems" },
   { key: "stock", label: "Low stock", to: "/inventory", feature: "inventory", valueKey: "lowStock" },
   { key: "sales", label: "Today sales", to: "/reports", feature: "reports", valueKey: "todaySales", format: "money" },
+  { key: "sold", label: "Items sold today", to: "/reports", feature: "reports", valueKey: "itemsSoldToday", retailOnly: true },
 ];
 
 export function DashboardPage() {
@@ -45,15 +49,23 @@ export function DashboardPage() {
     queryFn: () => posRepo.counts(verticalId),
   });
 
+  const retail = isRetailSite(site);
+  // Tables / open orders / KDS tiles are hidden in retail by the site gate (siteAllows is false for them).
   const cards = allCards.filter(
-    (c) => !c.feature || effectiveHasFeature(profile, c.feature, modules) && siteAllows(site, c.feature),
+    (c) =>
+      (!c.retailOnly || retail) &&
+      (!c.feature || (effectiveHasFeature(profile, c.feature, modules) && siteAllows(site, c.feature))),
   );
 
   return (
     <div>
       <PageHeader
         title={`${profile.shortLabel} overview`}
-        description={`Modules for ${profile.label}. Toggle tables & kitchen under Setup → preferences.`}
+        description={
+          retail
+            ? `Today at a glance for ${profile.label}.`
+            : `Modules for ${profile.label}. Toggle tables & kitchen under Setup → preferences.`
+        }
       />
       {effectiveHasFeature(profile, "sell", modules) ? (
         <Link

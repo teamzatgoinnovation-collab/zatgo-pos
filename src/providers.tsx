@@ -1,17 +1,10 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@zatgo/ui";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
+import { queryClient } from "@/lib/query-client";
 import { useThemeStore } from "@/store/theme";
 
 export function Providers({ children }: { children: ReactNode }) {
-  const [queryClient] = useState(
-    () =>
-      new QueryClient({
-        defaultOptions: {
-          queries: { staleTime: 5_000, retry: 1 },
-        },
-      }),
-  );
   const apply = useThemeStore((s) => s.apply);
   const mode = useThemeStore((s) => s.mode);
 

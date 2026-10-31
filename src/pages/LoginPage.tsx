@@ -4,6 +4,7 @@ import { Navigate, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { loginWithPassword, testConnection } from "@/lib/client";
 import { useSessionStore } from "@/store/session";
+import { OfflineUnlock } from "@/components/offline/OfflineUnlock";
 
 export function LoginPage() {
   const navigate = useNavigate();
@@ -51,6 +52,7 @@ export function LoginPage() {
   };
 
   return (
+    <>
     <ErpnextLoginCard
       productTitle="POS"
       usr={usr}
@@ -68,5 +70,7 @@ export function LoginPage() {
         </>
       }
     />
+    <OfflineUnlock />
+    </>
   );
 }

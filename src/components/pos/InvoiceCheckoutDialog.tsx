@@ -10,6 +10,7 @@ import {
   validateInvoiceMeta,
 } from "@/store/cart";
 import { money } from "@/lib/money";
+import { useConnectivity } from "@/lib/offline/connectivity";
 
 const inputClass =
   "mt-1 h-9 w-full rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-transparent px-3 text-sm outline-none focus:border-[var(--color-primary)]";
@@ -20,6 +21,7 @@ export function InvoiceCheckoutDialog({
   customers,
   tables,
   showTable,
+  showDelivery = true,
   total,
   busy,
   onClose,
@@ -31,6 +33,7 @@ export function InvoiceCheckoutDialog({
   customers: CustomerRecord[];
   tables: TableRecord[];
   showTable: boolean;
+  showDelivery?: boolean;
   total: number;
   busy?: boolean;
   onClose: () => void;
@@ -38,6 +41,8 @@ export function InvoiceCheckoutDialog({
   onConfirm: () => void;
 }) {
   const qc = useQueryClient();
+  // New customers need the site (their record is created there); offline you can only pick a saved one.
+  const offline = useConnectivity((s) => s.net !== "online");
   const [error, setError] = useState<string | null>(null);
   const [addingBoy, setAddingBoy] = useState(false);
   const [newBoyName, setNewBoyName] = useState("");
@@ -54,7 +59,7 @@ export function InvoiceCheckoutDialog({
   const types: { id: SaleType; label: string; hide?: boolean }[] = [
     { id: "counter", label: "Counter" },
     { id: "dine_in", label: "Table", hide: !showTable },
-    { id: "delivery", label: "Delivery" },
+    { id: "delivery", label: "Delivery", hide: !showDelivery },
   ];
 
   const {
@@ -172,6 +177,17 @@ export function InvoiceCheckoutDialog({
     onConfirm();
   };
 
+  // Saves the typed name/phone as a real customer now (the sale would otherwise create it when it is charged) and selects it.
+  const createCustomer = useMutation({
+    mutationFn: (input: { name: string; phone?: string }) => posRepo.upsertCustomer(input),
+    onSuccess: (customer) => {
+      void qc.invalidateQueries({ queryKey: ["pos", "customers"] });
+      patch({ customerId: customer.id, customerName: customer.name, customerPhone: customer.phone ?? "" });
+      toast.success(`Customer ${customer.name} saved`);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const onAddBoy = () => {
     const name = newBoyName.trim();
     const username = newBoyUsername.trim();
@@ -257,6 +273,11 @@ export function InvoiceCheckoutDialog({
           </div>
         </div>
 
+        {offline ? (
+          <p className="text-xs text-amber-700">
+            Offline: pick a saved customer or sell to a walk-in. New customers need a connection.
+          </p>
+        ) : null}
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="block text-sm sm:col-span-2">
             <span className="font-medium">Customer</span>
@@ -265,7 +286,7 @@ export function InvoiceCheckoutDialog({
               value={invoice.customerId ?? ""}
               onChange={(e) => onPickCustomer(e.target.value)}
             >
-              <option value="">Walk-in / custom</option>
+              <option value="">{offline ? "Walk-in" : "Walk-in / custom"}</option>
               {customers.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
@@ -279,6 +300,7 @@ export function InvoiceCheckoutDialog({
             <input
               className={inputClass}
               value={invoice.customerName}
+              disabled={offline}
               onChange={(e) =>
                 patch({ customerId: null, customerName: e.target.value })
               }
@@ -290,12 +312,29 @@ export function InvoiceCheckoutDialog({
             <input
               className={inputClass}
               value={invoice.customerPhone}
+              disabled={offline}
               onChange={(e) =>
                 patch({ customerId: null, customerPhone: e.target.value })
               }
               placeholder="+249 …"
             />
           </label>
+          {!offline && !invoice.customerId && invoice.customerName.trim() ? (
+            <div className="sm:col-span-2">
+              <Button
+                variant="outline"
+                onClick={() =>
+                  createCustomer.mutate({
+                    name: invoice.customerName.trim(),
+                    phone: invoice.customerPhone.trim() || undefined,
+                  })
+                }
+                disabled={createCustomer.isPending}
+              >
+                {createCustomer.isPending ? "Saving…" : "Save as new customer"}
+              </Button>
+            </div>
+          ) : null}
         </div>
 
         {invoice.saleType === "dine_in" ? (

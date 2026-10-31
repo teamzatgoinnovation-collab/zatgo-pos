@@ -9,6 +9,7 @@ import type {
   SelectedExtra,
 } from "@/lib/pos-repo";
 import { extrasKey, lineUnitPrice, sameExtras } from "@/lib/extras";
+import { roundMoney } from "@/lib/round";
 
 export type PaymentMethod = "cash" | "card" | "wallet";
 export type DiscountType = "none" | "percent" | "fixed";
@@ -192,18 +193,19 @@ export function cartPricing(
   taxRate: number,
 ): CartPricing {
   const subtotal = cartSubtotal(lines);
-  const discount = discountAmount(subtotal, discountType, discountValue);
-  const taxable = Math.max(0, subtotal - discount);
+  // Rounded to the cent the way the server posts it, so the receipt shows the figure ERPNext will book.
+  const discount = roundMoney(discountAmount(subtotal, discountType, discountValue));
+  const taxable = Math.max(0, roundMoney(subtotal - discount));
   const rate = Math.max(0, taxRate);
   // The site decides whether prices already include tax (company Sales Taxes template).
   const inclusive = useSiteStore.getState().profile?.taxInclusive ?? false;
-  const tax = inclusive ? taxable - taxable / (1 + rate) : taxable * rate;
+  const tax = roundMoney(inclusive ? taxable - taxable / (1 + rate) : taxable * rate);
   return {
     subtotal,
     discount,
     taxable,
     tax,
-    total: inclusive ? taxable : taxable + tax,
+    total: roundMoney(inclusive ? taxable : taxable + tax),
     itemCount: cartItemCount(lines),
   };
 }

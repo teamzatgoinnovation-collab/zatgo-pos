@@ -10,6 +10,7 @@ import {
   testConnection,
 } from "@/lib/client";
 import { useSiteStore } from "@/store/site";
+import { isRetailSite } from "@/lib/site-features";
 import { useSessionStore } from "@/store/session";
 
 const inputClass =
@@ -81,10 +82,15 @@ export function ConnectionPage() {
     <div>
       <PageHeader
         title="Setup"
-        description="Site profile, module preferences (tables / kitchen), printer, and ERPNext sign-in."
+        description={
+          isRetailSite(site)
+            ? "Site profile, printer, and ERPNext sign-in."
+            : "Site profile, module preferences (tables / kitchen), printer, and ERPNext sign-in."
+        }
       />
 
-      <FeaturePreferences />
+      {/* Floor / orders / kitchen don't exist in supermarket mode: their preferences are hidden. */}
+      {isRetailSite(site) ? null : <FeaturePreferences />}
 
       <PrinterSettings />
 
@@ -93,7 +99,8 @@ export function ConnectionPage() {
           <h2 className="mb-2 font-medium text-[var(--color-muted-foreground)]">Site profile</h2>
           <p>
             Company {site.company ?? "—"} · {site.currency ?? "—"} · industries:{" "}
-            {site.industries.length ? site.industries.join(", ") : "none"}
+            {site.industries.length ? site.industries.join(", ") : "none"} · POS mode:{" "}
+            {site.posMode ?? "off"}
           </p>
           <p className="text-xs text-[var(--color-muted-foreground)]">
             Set in ZG System Settings on the site, not in this app.

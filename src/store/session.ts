@@ -11,6 +11,8 @@ type SessionState = {
   user: string | null;
   fullName: string | null;
   lastError: string | null;
+  /** True when the POS was opened with a device PIN (no live login): selling is queued, syncing needs a real login. */
+  offlineUnlocked: boolean;
   setConnection: (patch: Partial<ConnectionConfig>) => void;
   setSession: (input: {
     connected: boolean;
@@ -19,6 +21,8 @@ type SessionState = {
     error?: string | null;
     baseUrl?: string;
   }) => void;
+  /** Open the POS from the device snapshot after a successful PIN check (main process verified it). */
+  unlockOffline: (user: string, fullName: string) => void;
   clearSession: () => void;
 };
 
@@ -34,6 +38,7 @@ export const useSessionStore = create<SessionState>()(
       user: null,
       fullName: null,
       lastError: null,
+      offlineUnlocked: false,
       setConnection: (patch) =>
         set((state) => ({
           connection: { ...state.connection, ...patch },
@@ -41,6 +46,7 @@ export const useSessionStore = create<SessionState>()(
           user: null,
           fullName: null,
           lastError: null,
+          offlineUnlocked: false,
         })),
       setSession: ({ connected, user = null, fullName = null, error = null, baseUrl }) =>
         set((state) => ({
@@ -48,16 +54,20 @@ export const useSessionStore = create<SessionState>()(
           user,
           fullName,
           lastError: error,
+          offlineUnlocked: false,
           connection: baseUrl
             ? { ...state.connection, baseUrl }
             : state.connection,
         })),
+      unlockOffline: (user, fullName) =>
+        set({ connected: false, user, fullName, lastError: null, offlineUnlocked: true }),
       clearSession: () =>
         set((state) => ({
           connected: false,
           user: null,
           fullName: null,
           lastError: null,
+          offlineUnlocked: false,
           connection: state.connection,
         })),
     }),

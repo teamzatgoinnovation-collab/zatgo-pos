@@ -27,6 +27,15 @@ export function ReceiptDocument({
         {doc.subtitle ? (
           <p className="mt-0.5 text-[11px] text-neutral-600">{doc.subtitle}</p>
         ) : null}
+        {doc.pendingSyncRef ? (
+          <p className="my-1 border-2 border-black p-1 text-[11px] font-bold">
+            PENDING SYNC
+            <br />
+            Offline receipt {doc.pendingSyncRef}
+            <br />
+            <span className="font-normal">Provisional — the final invoice is issued when this sale syncs</span>
+          </p>
+        ) : null}
         <p className="mt-1 text-[11px] text-neutral-600">
           #{doc.number} · {new Date(doc.issuedAt).toLocaleString()}
         </p>

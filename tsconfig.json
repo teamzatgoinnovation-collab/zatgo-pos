@@ -6,8 +6,9 @@
     "paths": {
       "@/*": ["src/*"]
     },
-    "types": ["vite/client"]
+    "types": ["vite/client"],
+    "allowImportingTsExtensions": true
   },
   "include": ["src"],
-  "exclude": ["node_modules", "dist", "dist-electron"]
+  "exclude": ["node_modules", "dist", "dist-electron", "src/**/*.test.ts"]
 }

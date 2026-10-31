@@ -1,6 +1,7 @@
 import { erpnextPing } from "@zatgo/erpnext";
 import { useSiteStore } from "@/store/site";
 import { useSessionStore } from "@/store/session";
+import { ApiError } from "@/lib/offline/api-error";
 
 export type LoginResult =
   | { ok: true; user: string; fullName: string; baseUrl: string }
@@ -91,16 +92,31 @@ export async function erpnextApi<T = unknown>(
       body: JSON.stringify(args),
     });
   } catch {
-    throw new Error("Cannot reach the server. ZatGo POS works online only — check your connection.");
+    throw new ApiError("Cannot reach the server — check your connection.", { network: true });
   }
-  const json = JSON.parse(res.bodyText || "{}") as {
+  let json: {
     message?: T | string;
     exception?: string;
+    exc_type?: string;
     _server_messages?: string;
   };
+  try {
+    json = JSON.parse(res.bodyText || "{}");
+  } catch {
+    // A proxy error page (502/504 ...) is not JSON: keep the HTTP status so the caller can classify it.
+    json = {};
+    if (res.ok) throw new ApiError("The site sent an unreadable response", { status: 502 });
+  }
   if (res.status === 404 && /\/zatgo_core\.api\.v1\.resto_pos\./.test(path)) {
-    throw new Error(
+    throw new ApiError(
       "Restaurant POS is switched off on this site (or zatgo-core is outdated). Enable Restaurant in ZG System Settings → Industries.",
+      { status: 404 },
+    );
+  }
+  if (res.status === 404 && /\/zatgo_core\.api\.v1\.retail_pos\./.test(path)) {
+    throw new ApiError(
+      "Supermarket POS is switched off on this site (or zatgo-core is outdated). Enable Supermarket in ZG System Settings → Industries.",
+      { status: 404 },
     );
   }
   if (!res.ok) {
@@ -119,7 +135,7 @@ export async function erpnextApi<T = unknown>(
         /* keep detail */
       }
     }
-    throw new Error(detail);
+    throw new ApiError(detail, { status: res.status, excType: json.exc_type ?? null });
   }
   return (json.message ?? json) as T;
 }

@@ -128,6 +128,8 @@ export type ProductRecord = {
   requiresPrescription?: boolean;
   unit?: string;
   extras?: ProductExtra[];
+  /** Cached on-hand quantity from the last snapshot, when the site sends one. */
+  stockQty?: number;
 };
 
 /** @deprecated use ProductRecord — kept for page import compatibility */

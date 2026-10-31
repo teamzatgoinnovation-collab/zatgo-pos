@@ -17,7 +17,9 @@ export type PosFeature =
   | "reports"
   | "batches"
   | "serials"
-  | "prescriptions";
+  | "prescriptions"
+  /** Couriers / delivery staff (restaurant delivery channel). */
+  | "delivery";
 
 export type VerticalProfile = {
   id: VerticalId;
@@ -31,6 +33,8 @@ export type VerticalProfile = {
   primaryAction: "orders" | "sell";
 };
 
+export const VERTICAL_IDS: readonly string[] = ["restaurant", "cafe", "supermarket", "pharmacy", "electrical", "general"];
+
 const allCommon: PosFeature[] = ["sell", "catalog", "billing", "inventory", "reports"];
 
 export const VERTICALS: VerticalProfile[] = [
@@ -39,7 +43,7 @@ export const VERTICALS: VerticalProfile[] = [
     label: "Restaurant",
     shortLabel: "Restaurant",
     description: "Counter POS plus table service, floor map, and kitchen display.",
-    features: [...allCommon, "floor", "orders", "kds"],
+    features: [...allCommon, "floor", "orders", "kds", "delivery"],
     catalogNoun: "Menu item",
     catalogNounPlural: "Menu",
     primaryAction: "sell",
@@ -49,7 +53,7 @@ export const VERTICALS: VerticalProfile[] = [
     label: "Café / Coffee shop",
     shortLabel: "Café",
     description: "Counter POS with optional tables and bar/kitchen tickets.",
-    features: [...allCommon, "floor", "orders", "kds"],
+    features: [...allCommon, "floor", "orders", "kds", "delivery"],
     catalogNoun: "Menu item",
     catalogNounPlural: "Menu",
     primaryAction: "sell",

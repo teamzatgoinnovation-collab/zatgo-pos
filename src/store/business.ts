@@ -8,11 +8,6 @@ import { getVertical, type VerticalId, type VerticalProfile } from "@/lib/vertic
 
 const MODULES_KEY = "zatgo-pos-modules";
 
-/** The business profile comes from the site (zatgo-core industries); the POS UI is the restaurant profile. */
-function readVertical(): VerticalId {
-  return "restaurant";
-}
-
 function readModules(verticalId: VerticalId): ModulePrefs {
   const defaults = modulesFromVertical(verticalId);
   try {
@@ -42,13 +37,16 @@ type BusinessState = {
   profile: VerticalProfile;
   modules: ModulePrefs;
   setVertical: (id: VerticalId) => void;
+  /** Follow the site's POS Type (restaurant | cafe | supermarket | general). Does not overwrite the saved restaurant module prefs. */
+  applySiteVertical: (id: VerticalId) => void;
   setModule: (id: PrefModule, enabled: boolean) => void;
   setModules: (modules: ModulePrefs) => void;
   resetModulesToProfile: () => void;
 };
 
 export const useBusinessStore = create<BusinessState>((set, get) => {
-  const verticalId = typeof window !== "undefined" ? readVertical() : "restaurant";
+  // Until the site profile loads the POS assumes restaurant; the site store then calls applySiteVertical.
+  const verticalId: VerticalId = "restaurant";
   const modules =
     typeof window !== "undefined" ? readModules(verticalId) : modulesFromVertical(verticalId);
 
@@ -64,6 +62,13 @@ export const useBusinessStore = create<BusinessState>((set, get) => {
         profile: getVertical(id),
         modules: nextModules,
       });
+    },
+    applySiteVertical: (id) => {
+      if (get().verticalId === id) return;
+      // Restaurant and cafe keep the terminal's saved floor/orders/kds prefs; other verticals use their defaults in
+      // memory only (the site gates those modules off in retail mode, so the prefs don't matter there).
+      const nextModules = id === "restaurant" || id === "cafe" ? readModules(id) : modulesFromVertical(id);
+      set({ verticalId: id, profile: getVertical(id), modules: nextModules });
     },
     setModule: (id, enabled) => {
       const modules = { ...get().modules, [id]: enabled };

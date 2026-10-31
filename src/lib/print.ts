@@ -1,11 +1,20 @@
 import { documentToHtml, type PosDocument } from "@/lib/pos-document";
 import { usePrinterStore } from "@/store/printer";
+import { usePosSettings } from "@/lib/offline/settings";
+import type { Paper } from "@/lib/invoice-html";
+
+/** The paper to use: this device's choice, else the site's ZG POS Settings (80mm by default). Kitchen tickets are always 80mm. */
+export function activePaper(doc?: PosDocument): Paper {
+  if (doc?.kind === "kitchen") return "80mm";
+  return usePrinterStore.getState().paper ?? usePosSettings.getState().settings.counter.paperSize;
+}
 
 export async function printPosDocument(
   doc: PosDocument,
-  options?: { silent?: boolean },
+  options?: { silent?: boolean; paper?: Paper },
 ): Promise<{ ok: true } | { ok: false; message: string }> {
-  const html = documentToHtml(doc);
+  const paper = options?.paper ?? activePaper(doc);
+  const html = documentToHtml(doc, paper);
   const { deviceName, silentPrint } = usePrinterStore.getState();
   const desktop = window.zatgoDesktop;
 
@@ -15,6 +24,7 @@ export async function printPosDocument(
       deviceName: deviceName || undefined,
       silent: options?.silent ?? silentPrint,
       landscape: false,
+      paper,
     });
     return result;
   }

@@ -1,155 +1,31 @@
+import { useMemo } from "react";
 import { cn } from "@zatgo/ui";
-import type { PosDocument } from "@/lib/pos-document";
-import { money } from "@/lib/money";
+import { documentToHtml, type PosDocument } from "@/lib/pos-document";
+import type { Paper } from "@/lib/invoice-html";
+import { activePaper } from "@/lib/print";
 
+/** The preview is the printable HTML itself (one markup for screen and printer), shown at the paper's width. */
 export function ReceiptDocument({
   doc,
+  paper,
   className,
 }: {
   doc: PosDocument;
+  paper?: Paper;
   className?: string;
 }) {
-  const isKitchen = doc.kind === "kitchen";
-  const isInvoice = doc.kind === "invoice";
-
+  const size = paper ?? activePaper(doc);
+  const html = useMemo(() => documentToHtml(doc, size), [doc, size]);
   return (
-    <div
+    <iframe
+      title="Document preview"
+      srcDoc={html}
+      sandbox=""
       className={cn(
-        "mx-auto rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-white text-black shadow-sm",
-        isInvoice ? "max-w-xl p-6 font-sans text-sm" : "max-w-[280px] p-4 font-mono text-xs",
+        "mx-auto block rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-white shadow-sm",
+        size === "a4" ? "h-[70vh] w-full max-w-[794px]" : "h-[60vh] w-[320px]",
         className,
       )}
-    >
-      <div className="text-center">
-        <p className={cn("font-semibold", isInvoice ? "text-lg" : "text-sm")}>
-          {doc.businessName}
-        </p>
-        {doc.subtitle ? (
-          <p className="mt-0.5 text-[11px] text-neutral-600">{doc.subtitle}</p>
-        ) : null}
-        {doc.pendingSyncRef ? (
-          <p className="my-1 border-2 border-black p-1 text-[11px] font-bold">
-            PENDING SYNC
-            <br />
-            Offline receipt {doc.pendingSyncRef}
-            <br />
-            <span className="font-normal">Provisional — the final invoice is issued when this sale syncs</span>
-          </p>
-        ) : null}
-        <p className="mt-1 text-[11px] text-neutral-600">
-          #{doc.number} · {new Date(doc.issuedAt).toLocaleString()}
-        </p>
-        {doc.tableName ? (
-          <p className="text-[11px] text-neutral-600">
-            {doc.tableName}
-            {doc.server ? ` · ${doc.server}` : ""}
-            {doc.channel ? ` · ${doc.channel.replaceAll("_", " ")}` : ""}
-          </p>
-        ) : null}
-        {doc.customerName ? (
-          <p className="text-[11px] text-neutral-600">
-            Customer: {doc.customerName}
-            {doc.customerPhone ? ` · ${doc.customerPhone}` : ""}
-          </p>
-        ) : null}
-        {doc.deliveryAddress ? (
-          <p className="text-[11px] text-neutral-600">
-            Deliver to: {doc.deliveryAddress}
-            {doc.deliveryPhone ? ` · ${doc.deliveryPhone}` : ""}
-          </p>
-        ) : null}
-        {doc.deliveryBoyName ? (
-          <p className="text-[11px] text-neutral-600">
-            Courier: {doc.deliveryBoyName}
-          </p>
-        ) : null}
-      </div>
-
-      <div className="my-3 border-t border-dashed border-neutral-400" />
-
-      <ul className="space-y-2">
-        {doc.lines.length === 0 ? (
-          <li className="text-neutral-500">No lines</li>
-        ) : (
-          doc.lines.map((line, idx) => (
-            <li key={`${line.name}-${idx}`} className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="leading-snug">
-                  {isKitchen ? <strong>{line.qty}× </strong> : null}
-                  {line.name}
-                </p>
-                {line.extras ? (
-                  <p className="text-[11px] text-neutral-600">+ {line.extras}</p>
-                ) : null}
-                {!isKitchen ? (
-                  <p className="text-[11px] text-neutral-600">
-                    {line.qty} × {money(line.unitPrice)}
-                  </p>
-                ) : null}
-                {line.meta ? (
-                  <p className="text-[11px] capitalize text-neutral-500">{line.meta}</p>
-                ) : null}
-              </div>
-              {!isKitchen ? (
-                <span className="tabular-nums">{money(line.total)}</span>
-              ) : null}
-            </li>
-          ))
-        )}
-      </ul>
-
-      {!isKitchen ? (
-        <>
-          <div className="my-3 border-t border-dashed border-neutral-400" />
-          <div className="space-y-1">
-            <Row label="Subtotal" value={`${money(doc.subtotal)}`} />
-            {doc.discount > 0 ? (
-              <Row label="Discount" value={`−${money(doc.discount)}`} />
-            ) : null}
-            <Row label="Tax" value={`${money(doc.tax)}`} />
-            <Row label="Total" value={`${money(doc.total)}`} strong />
-            {doc.paymentMethod ? (
-              <Row label="Paid" value={doc.paymentMethod} capitalize />
-            ) : null}
-            {doc.cashTendered !== undefined ? (
-              <Row label="Tendered" value={`${money(doc.cashTendered)}`} />
-            ) : null}
-            {doc.changeDue !== undefined ? (
-              <Row label="Change" value={`${money(doc.changeDue)}`} />
-            ) : null}
-          </div>
-        </>
-      ) : (
-        <div className="my-3 border-t border-dashed border-neutral-400" />
-      )}
-
-      {doc.footerNote ? (
-        <p className="mt-4 text-center text-[11px] text-neutral-600">{doc.footerNote}</p>
-      ) : null}
-    </div>
-  );
-}
-
-function Row({
-  label,
-  value,
-  strong,
-  capitalize,
-}: {
-  label: string;
-  value: string;
-  strong?: boolean;
-  capitalize?: boolean;
-}) {
-  return (
-    <div
-      className={cn(
-        "flex items-center justify-between gap-3",
-        strong && "text-sm font-semibold",
-      )}
-    >
-      <span>{label}</span>
-      <span className={cn("tabular-nums", capitalize && "capitalize")}>{value}</span>
-    </div>
+    />
   );
 }

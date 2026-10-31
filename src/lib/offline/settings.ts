@@ -14,7 +14,26 @@ export type PosSettings = {
   showTaxOnReceipt: boolean;
   printCopies: number;
   defaultPaymentMode: string | null;
+  counter: CounterSettings;
 };
+
+/** ZG POS Settings -> Counter Screen / Receipt & Printing: how the POS lists products and prints the invoice. */
+export type CounterSettings = {
+  paperSize: "80mm" | "a4";
+  productView: "grid" | "row";
+  allowPriceChange: boolean;
+  invoiceQr: "phase1" | "off";
+};
+
+export function parseCounterSettings(raw: unknown): CounterSettings {
+  const d = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  return {
+    paperSize: String(d.paper_size ?? "").toLowerCase() === "a4" ? "a4" : "80mm",
+    productView: d.product_view === "row" ? "row" : "grid",
+    allowPriceChange: d.allow_price_change === 1 || d.allow_price_change === true || d.allow_price_change === "1",
+    invoiceQr: d.invoice_qr === "off" ? "off" : "phase1",
+  };
+}
 
 export const POS_SETTINGS_METHOD = "zatgo_core.api.v1.pos_settings.get";
 
@@ -31,6 +50,7 @@ export function parsePosSettings(raw: unknown): PosSettings {
     showTaxOnReceipt: flag(d.show_tax_on_receipt, true),
     printCopies: Math.max(1, Math.floor(Number(d.print_copies ?? 1)) || 1),
     defaultPaymentMode: d.default_payment_mode ? String(d.default_payment_mode) : null,
+    counter: parseCounterSettings(d.counter),
   };
 }
 

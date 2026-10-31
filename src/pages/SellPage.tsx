@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Button, FormDialog } from "@zatgo/ui";
+import { Button, cn, FormDialog } from "@zatgo/ui";
+import { LayoutGrid, Menu as ListIcon } from "@zatgo/icons";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { BarcodeScanField } from "@/components/pos/BarcodeScanField";
@@ -45,6 +46,7 @@ import { useBusinessStore } from "@/store/business";
 import { useSiteStore } from "@/store/site";
 import { isRetailSite } from "@/lib/site-features";
 import {
+  cartLineUnitPrice,
   cartPricing,
   invoiceMetaToCheckout,
   useCartStore,
@@ -65,6 +67,11 @@ export function SellPage() {
   const showFloor = useHasFeature("floor");
   const showDelivery = useHasFeature("delivery");
   const retail = useSiteStore((s) => isRetailSite(s.profile));
+  // Product list: this device's choice, else ZG POS Settings -> Product List.
+  const siteView = usePosSettings((s) => s.settings.counter.productView);
+  const deviceView = usePrinterStore((s) => s.productView);
+  const setProductView = usePrinterStore((s) => s.setProductView);
+  const productView = deviceView ?? siteView;
   const qc = useQueryClient();
   const [scan, setScan] = useState("");
   const [category, setCategory] = useState<string>("all");
@@ -265,7 +272,7 @@ export function SellPage() {
           lines.map((l) => ({
             productId: l.product.id,
             name: l.product.name,
-            price: lineUnitPrice(l.product.price, l.extras),
+            price: cartLineUnitPrice(l),
             station: l.product.station,
             qty: l.qty,
             extras: l.extras,
@@ -477,13 +484,30 @@ export function SellPage() {
             inputRef={scanRef}
             autoFocus={retail}
           />
-          <CategoryChips
-            categories={categories}
-            value={category}
-            onChange={setCategory}
-          />
+          <div className="flex items-center gap-2">
+            <div className="min-w-0 flex-1">
+              <CategoryChips categories={categories} value={category} onChange={setCategory} />
+            </div>
+            <div className="flex shrink-0 overflow-hidden rounded-[var(--radius-lg)] border border-[var(--color-border)]" role="group" aria-label="Product list view">
+              {(["grid", "row"] as const).map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  title={v === "grid" ? "Tiles" : "List"}
+                  aria-pressed={productView === v}
+                  onClick={() => setProductView(v)}
+                  className={cn(
+                    "flex h-8 w-9 items-center justify-center text-xs transition-colors",
+                    productView === v ? "pos-brand-bg" : "text-[var(--color-muted-foreground)] hover:bg-[var(--color-muted)]",
+                  )}
+                >
+                  {v === "grid" ? <LayoutGrid className="size-4" /> : <ListIcon className="size-4" />}
+                </button>
+              ))}
+            </div>
+          </div>
           <div className="min-h-0 flex-1 overflow-hidden">
-            <ProductGrid products={visible} qtyOf={qtyOf} onAdd={addProduct} />
+            <ProductGrid products={visible} qtyOf={qtyOf} onAdd={addProduct} view={productView} />
           </div>
         </section>
 

@@ -47,6 +47,9 @@ export type CustomerRecord = {
   phone?: string;
   email?: string;
   address?: string;
+  /** Customer VAT number and commercial registration, printed in the invoice's buyer block. */
+  vatNumber?: string;
+  crNumber?: string;
 };
 
 export type DeliveryInfo = {
@@ -96,6 +99,9 @@ export type OrderRecord = {
   delivery?: DeliveryInfo | null;
   /** Set when channel is delivery — awaiting kitchen handoff or already given to Delivery. */
   deliveryStatus?: DeliveryStatus | null;
+  /** ZATCA QR payloads (base64 TLV) stored on the posted invoice. */
+  zatcaQr?: string;
+  zatcaQrP2?: string;
 };
 
 export type KdsTicket = {

@@ -1,6 +1,14 @@
 import type { OrderRecord, PaymentRecord } from "@/lib/pos-repo";
+import type { CustomerRecord } from "@/lib/pos-models";
 import { extrasSummary } from "@/lib/extras";
 import type { VerticalProfile } from "@/lib/verticals";
+import { renderInvoiceHtml, type Paper } from "@/lib/invoice-html";
+import { money } from "@/lib/money";
+import { qrSvgMarkup } from "@/lib/qr-svg";
+import { zatcaTimestamp, zatcaTlvBase64 } from "@/lib/zatca-tlv";
+import { queryClient } from "@/lib/query-client";
+import { usePosSettings } from "@/lib/offline/settings";
+import { useSiteStore } from "@/store/site";
 
 export type DocumentKind = "receipt" | "invoice" | "kitchen";
 
@@ -11,6 +19,17 @@ export type PosDocumentLine = {
   total: number;
   meta?: string;
   extras?: string;
+};
+
+export type PartyInfo = {
+  name: string;
+  nameAr?: string;
+  vatNumber?: string;
+  crNumber?: string;
+  phone?: string;
+  email?: string;
+  website?: string;
+  address?: string;
 };
 
 export type PosDocument = {
@@ -38,10 +57,67 @@ export type PosDocument = {
   footerNote?: string;
   /** Offline receipt number while the site has not posted the sale yet. */
   pendingSyncRef?: string;
+  /** Seller and buyer details printed on the invoice (blank values are left out). */
+  company?: PartyInfo;
+  buyer?: PartyInfo;
+  /** ZATCA QR payload (base64 TLV): Phase 1 built on the device, or the Phase 2 stamp once the site has it. */
+  qr?: { phase: 1 | 2; base64: string; provisional?: boolean };
+  /** ZG POS Settings -> Receipt Header, shown under the seller block. */
+  headerNote?: string;
+  /** ZG POS Settings -> Show Tax Breakdown on Receipt. */
+  showTax?: boolean;
 };
 
-function money(n: number) {
-  return `$${n.toFixed(2)}`;
+function sellerInfo(): PartyInfo | undefined {
+  const info = useSiteStore.getState().profile?.companyInfo;
+  if (!info || !info.name) return undefined;
+  return { ...info };
+}
+
+function buyerInfo(order: OrderRecord): PartyInfo | undefined {
+  const known = order.customerId
+    ? queryClient.getQueryData<CustomerRecord[]>(["pos", "customers"])?.find((c) => c.id === order.customerId)
+    : undefined;
+  if (known) {
+    return {
+      name: known.name,
+      vatNumber: known.vatNumber,
+      crNumber: known.crNumber,
+      phone: known.phone ?? order.customerPhone ?? undefined,
+      email: known.email,
+      address: known.address,
+    };
+  }
+  if (!order.customerName) return undefined;
+  return { name: order.customerName, phone: order.customerPhone ?? undefined };
+}
+
+/** Phase 2 stamp if the site has one, else the server's stored Phase 1 QR, else Phase 1 built here from the sale's own figures. */
+function invoiceQr(input: {
+  order: OrderRecord;
+  seller: PartyInfo | undefined;
+  issuedAt: string;
+  total: number;
+  tax: number;
+  provisional: boolean;
+}): PosDocument["qr"] {
+  if (usePosSettings.getState().settings.counter.invoiceQr === "off") return undefined;
+  const { order, seller } = input;
+  if (order.zatcaQrP2) return { phase: 2, base64: order.zatcaQrP2 };
+  if (order.zatcaQr && !input.provisional) return { phase: 1, base64: order.zatcaQr };
+  if (!seller?.vatNumber) return undefined; // a Phase 1 QR needs the seller's VAT number
+  const when = new Date(input.issuedAt);
+  return {
+    phase: 1,
+    provisional: input.provisional,
+    base64: zatcaTlvBase64({
+      sellerName: seller.name,
+      vatNumber: seller.vatNumber,
+      timestamp: zatcaTimestamp(Number.isNaN(when.getTime()) ? new Date() : when),
+      total: input.total,
+      vatAmount: input.tax,
+    }),
+  };
 }
 
 export function buildSaleDocument(input: {
@@ -67,9 +143,17 @@ export function buildSaleDocument(input: {
       ? cashTendered - total
       : undefined;
 
+  const seller = sellerInfo();
+  const settings = usePosSettings.getState().settings;
+  const issuedAt = payment?.paidAt ?? order.openedAt;
   return {
+    company: seller,
+    buyer: buyerInfo(order),
+    qr: invoiceQr({ order, seller, issuedAt, total, tax, provisional: Boolean(input.pendingSyncRef) }),
+    headerNote: settings.receiptHeader || undefined,
+    showTax: settings.showTaxOnReceipt,
     kind,
-    businessName: `ZatGo POS · ${profile.shortLabel}`,
+    businessName: seller?.name ?? `ZatGo POS · ${profile.shortLabel}`,
     subtitle:
       kind === "invoice"
         ? dining
@@ -103,13 +187,14 @@ export function buildSaleDocument(input: {
     deliveryBoyName: order.delivery?.deliveryBoyName ?? undefined,
     pendingSyncRef: input.pendingSyncRef,
     footerNote:
-      kind === "invoice"
+      settings.receiptFooter ||
+      (kind === "invoice"
         ? order.channel === "delivery"
           ? "Thank you — delivery invoice. Please retain for your records."
           : dining
             ? "Thank you for dining with us. Please retain this invoice."
             : "Thank you for your purchase. Please retain this invoice."
-        : "Thank you for your purchase.",
+        : "Thank you for your purchase."),
   };
 }
 
@@ -144,112 +229,9 @@ export function buildKitchenDocument(input: {
   };
 }
 
-export function documentToHtml(doc: PosDocument): string {
-  const isKitchen = doc.kind === "kitchen";
-  const isInvoice = doc.kind === "invoice";
-  const width = isInvoice ? "720px" : "280px";
-  const font = isInvoice ? "14px" : "12px";
-
-  const linesHtml = doc.lines
-    .map((line) => {
-      if (isKitchen) {
-        return `<tr>
-          <td>
-            <div><strong>${line.qty}×</strong> ${escapeHtml(line.name)}</div>
-            ${line.extras ? `<div class="muted">+ ${escapeHtml(line.extras)}</div>` : ""}
-          </td>
-          <td class="right muted">${escapeHtml(line.meta ?? "")}</td>
-        </tr>`;
-      }
-      return `<tr>
-        <td>
-          <div>${escapeHtml(line.name)}</div>
-          ${line.extras ? `<div class="muted">+ ${escapeHtml(line.extras)}</div>` : ""}
-          <div class="muted">${line.qty} × ${money(line.unitPrice)}</div>
-        </td>
-        <td class="right">${money(line.total)}</td>
-      </tr>`;
-    })
-    .join("");
-
-  const totals = isKitchen
-    ? ""
-    : `<div class="totals">
-        <div><span>Subtotal</span><span>${money(doc.subtotal)}</span></div>
-        ${doc.discount > 0 ? `<div><span>Discount</span><span>−${money(doc.discount)}</span></div>` : ""}
-        <div><span>Tax</span><span>${money(doc.tax)}</span></div>
-        <div class="grand"><span>Total</span><span>${money(doc.total)}</span></div>
-        ${doc.paymentMethod ? `<div><span>Paid</span><span class="cap">${escapeHtml(doc.paymentMethod)}</span></div>` : ""}
-        ${doc.cashTendered !== undefined ? `<div><span>Tendered</span><span>${money(doc.cashTendered)}</span></div>` : ""}
-        ${doc.changeDue !== undefined ? `<div><span>Change</span><span>${money(doc.changeDue)}</span></div>` : ""}
-      </div>`;
-
-  return `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8" />
-  <title>${escapeHtml(doc.subtitle ?? doc.kind)} #${escapeHtml(doc.number)}</title>
-  <style>
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      padding: 16px;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-      font-size: ${font};
-      color: #111;
-      background: #fff;
-    }
-    .sheet { width: ${width}; max-width: 100%; margin: 0 auto; }
-    h1 { font-size: ${isInvoice ? "20px" : "15px"}; margin: 0 0 4px; text-align: center; }
-    .sub, .meta { text-align: center; color: #555; margin: 0 0 4px; }
-    .rule { border: none; border-top: 1px dashed #999; margin: 12px 0; }
-    table { width: 100%; border-collapse: collapse; }
-    td { vertical-align: top; padding: 4px 0; }
-    .right { text-align: right; white-space: nowrap; }
-    .muted { color: #666; font-size: 0.9em; }
-    .cap { text-transform: capitalize; }
-    .totals div { display: flex; justify-content: space-between; gap: 12px; padding: 2px 0; }
-    .grand { font-weight: 700; font-size: 1.1em; margin-top: 4px; }
-    .pending { border: 2px solid #111; text-align: center; font-weight: 700; padding: 4px; margin: 6px 0; }
-    .footer { text-align: center; color: #555; margin-top: 14px; font-size: 0.9em; }
-    @media print {
-      body { padding: 0; }
-      .sheet { width: ${isInvoice ? "100%" : "80mm"}; }
-    }
-  </style>
-</head>
-<body>
-  <div class="sheet">
-    <h1>${escapeHtml(doc.businessName)}</h1>
-    ${doc.subtitle ? `<p class="sub">${escapeHtml(doc.subtitle)}</p>` : ""}
-    ${doc.pendingSyncRef ? `<p class="pending">PENDING SYNC<br />Offline receipt ${escapeHtml(doc.pendingSyncRef)}<br /><span style="font-weight:400">Provisional — the final invoice is issued when this sale syncs</span></p>` : ""}
-    <p class="meta">#${escapeHtml(doc.number)} · ${escapeHtml(formatWhen(doc.issuedAt))}</p>
-    ${doc.tableName ? `<p class="meta">${escapeHtml(doc.tableName)}${doc.server ? ` · ${escapeHtml(doc.server)}` : ""}${doc.channel ? ` · ${escapeHtml(doc.channel.replaceAll("_", " "))}` : ""}</p>` : ""}
-    ${doc.customerName ? `<p class="meta">Customer: ${escapeHtml(doc.customerName)}${doc.customerPhone ? ` · ${escapeHtml(doc.customerPhone)}` : ""}</p>` : ""}
-    ${doc.deliveryAddress ? `<p class="meta">Deliver to: ${escapeHtml(doc.deliveryAddress)}${doc.deliveryPhone ? ` · ${escapeHtml(doc.deliveryPhone)}` : ""}</p>` : ""}
-    ${doc.deliveryBoyName ? `<p class="meta">Courier: ${escapeHtml(doc.deliveryBoyName)}</p>` : ""}
-    <hr class="rule" />
-    <table>${linesHtml || `<tr><td class="muted">No lines</td></tr>`}</table>
-    <hr class="rule" />
-    ${totals}
-    ${doc.footerNote ? `<p class="footer">${escapeHtml(doc.footerNote)}</p>` : ""}
-  </div>
-</body>
-</html>`;
-}
-
-function escapeHtml(value: string) {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;");
-}
-
-function formatWhen(iso: string) {
-  try {
-    return new Date(iso).toLocaleString();
-  } catch {
-    return iso;
-  }
+export function documentToHtml(doc: PosDocument, paper: Paper = "80mm"): string {
+  return renderInvoiceHtml(doc, paper, {
+    formatMoney: money,
+    qrSvg: doc.qr ? qrSvgMarkup(doc.qr.base64) : "",
+  });
 }

@@ -20,6 +20,8 @@ export type CartLine = {
   product: ProductRecord;
   qty: number;
   extras: SelectedExtra[];
+  /** A price the cashier typed for this line (ZG POS Settings -> Allow Cashier to Change Prices); replaces the list price + extras. */
+  priceOverride?: number;
 };
 
 export type CartInvoiceMeta = {
@@ -136,6 +138,8 @@ type CartState = {
   held: HeldSale[];
   add: (product: ProductRecord, extras?: SelectedExtra[], qty?: number) => void;
   setQty: (lineId: string, qty: number) => void;
+  /** Set (or with null clear) the typed unit price of a line. Never negative. */
+  setPrice: (lineId: string, price: number | null) => void;
   increment: (lineId: string) => void;
   decrement: (lineId: string) => void;
   remove: (lineId: string) => void;
@@ -169,7 +173,7 @@ type CartState = {
 };
 
 export function cartLineUnitPrice(line: CartLine) {
-  return lineUnitPrice(line.product.price, line.extras);
+  return line.priceOverride ?? lineUnitPrice(line.product.price, line.extras);
 }
 
 export function cartSubtotal(lines: CartLine[]) {
@@ -216,6 +220,7 @@ function cloneLine(line: CartLine): CartLine {
     product: line.product,
     qty: line.qty,
     extras: line.extras.map((e) => ({ ...e })),
+    ...(line.priceOverride !== undefined ? { priceOverride: line.priceOverride } : {}),
   };
 }
 
@@ -256,7 +261,7 @@ export const useCartStore = create<CartState>((set, get) => ({
     const normalized = [...extras].sort((a, b) => a.id.localeCompare(b.id));
     set((state) => {
       const hit = state.lines.find(
-        (l) => l.product.id === product.id && sameExtras(l.extras, normalized),
+        (l) => l.product.id === product.id && sameExtras(l.extras, normalized) && l.priceOverride === undefined,
       );
       if (hit) {
         return {
@@ -285,6 +290,15 @@ export const useCartStore = create<CartState>((set, get) => ({
     }
     set((state) => ({
       lines: state.lines.map((l) => (l.lineId === lineId ? { ...l, qty } : l)),
+    }));
+  },
+  setPrice: (lineId, price) => {
+    set((state) => ({
+      lines: state.lines.map((l) => {
+        if (l.lineId !== lineId) return l;
+        const { priceOverride: _drop, ...rest } = l;
+        return price === null || !Number.isFinite(price) || price < 0 ? rest : { ...rest, priceOverride: roundMoney(price) };
+      }),
     }));
   },
   increment: (lineId) => {

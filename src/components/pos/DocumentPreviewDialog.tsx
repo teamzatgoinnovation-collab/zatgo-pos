@@ -2,7 +2,8 @@ import { Button, FormDialog } from "@zatgo/ui";
 import { FileText, Printer } from "@zatgo/icons";
 import { useState } from "react";
 import { toast } from "sonner";
-import { openCashDrawerIfNeeded, printPosDocument } from "@/lib/print";
+import { activePaper, openCashDrawerIfNeeded, printPosDocument } from "@/lib/print";
+import { usePrinterStore } from "@/store/printer";
 import type { DocumentKind, PosDocument } from "@/lib/pos-document";
 import { ReceiptDocument } from "./ReceiptDocument";
 
@@ -20,6 +21,8 @@ export function DocumentPreviewDialog({
   allowKindToggle?: boolean;
 }) {
   const [printing, setPrinting] = useState(false);
+  const devicePaper = usePrinterStore((s) => s.paper);
+  const setPaper = usePrinterStore((s) => s.setPaper);
 
   if (!document) return null;
 
@@ -52,7 +55,7 @@ export function DocumentPreviewDialog({
       open={open}
       title={title}
       onClose={onClose}
-      className={document.kind === "invoice" ? "max-w-2xl" : undefined}
+      className={document.kind !== "kitchen" && activePaper(document) === "a4" ? "max-w-4xl" : "max-w-md"}
       footer={
         <>
           <Button variant="outline" onClick={onClose}>
@@ -86,7 +89,28 @@ export function DocumentPreviewDialog({
         </div>
       ) : null}
 
-      <div className="max-h-[60vh] overflow-auto rounded-[var(--radius-lg)] bg-[var(--color-muted)] p-4">
+      {document.kind !== "kitchen" ? (
+        <div className="mb-3 flex items-center gap-2 text-xs">
+          <span className="text-[var(--color-muted-foreground)]">Paper</span>
+          {(["80mm", "a4"] as const).map((p) => (
+            <Button
+              key={p}
+              variant={activePaper(document) === p ? "default" : "outline"}
+              className="h-7 px-3 text-xs"
+              onClick={() => setPaper(p)}
+            >
+              {p === "a4" ? "A4" : "80 mm"}
+            </Button>
+          ))}
+          {devicePaper ? (
+            <button type="button" className="text-[var(--color-muted-foreground)] underline" onClick={() => setPaper(null)}>
+              use site default
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+
+      <div className="max-h-[70vh] overflow-auto rounded-[var(--radius-lg)] bg-[var(--color-muted)] p-4">
         <ReceiptDocument doc={document} />
       </div>
     </FormDialog>

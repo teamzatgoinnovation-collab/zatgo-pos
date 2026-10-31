@@ -95,6 +95,7 @@ ipcMain.handle(
       deviceName?: string;
       silent?: boolean;
       landscape?: boolean;
+      paper?: "80mm" | "a4";
     },
   ) => {
     const printWin = new BrowserWindow({
@@ -110,6 +111,14 @@ ipcMain.handle(
       await printWin.loadURL(
         `data:text/html;charset=utf-8,${encodeURIComponent(payload.html)}`,
       );
+      // A4 is a standard page; an 80mm roll is 80 mm wide and as tall as the receipt (microns).
+      let pageSize: "A4" | { width: number; height: number } = "A4";
+      if (payload.paper !== "a4") {
+        const heightPx = Number(
+          await printWin.webContents.executeJavaScript("Math.ceil(document.documentElement.scrollHeight)"),
+        );
+        pageSize = { width: 80_000, height: Math.max(100_000, Math.round((Number.isFinite(heightPx) ? heightPx : 600) * 264.58) + 10_000) };
+      }
       await new Promise<void>((resolve, reject) => {
         let settled = false;
         const finish = (err?: Error) => {
@@ -131,6 +140,7 @@ ipcMain.handle(
               deviceName: payload.deviceName,
               printBackground: true,
               landscape: Boolean(payload.landscape),
+              pageSize,
             },
             (success, failureReason) => {
               if (!success) {

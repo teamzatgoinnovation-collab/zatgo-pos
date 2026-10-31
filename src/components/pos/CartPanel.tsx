@@ -4,6 +4,7 @@ import { formatExtras } from "@/lib/extras";
 import {
   cartLineUnitPrice,
   cartPricing,
+  useCartStore,
   type CartInvoiceMeta,
   type CartLine,
   type DiscountType,
@@ -65,6 +66,9 @@ export function CartPanel({
   onCharge: () => void;
 }) {
   const pricing = cartPricing(lines, discountType, discountValue, taxRate);
+  // ZG POS Settings -> Allow Cashier to Change Prices (default off); the site still refuses a price below list for users without the override role.
+  const allowPriceChange = usePosSettings((s) => s.settings.counter.allowPriceChange);
+  const setPrice = useCartStore((s) => s.setPrice);
   // pos_settings: discounts can be switched off or capped (% of the subtotal); the site enforces it again.
   const allowDiscounts = usePosSettings((s) => s.settings.allowDiscounts);
   const maxDiscountPercent = usePosSettings((s) => s.settings.maxDiscountPercent);
@@ -152,6 +156,8 @@ export function CartPanel({
               onDecrement={() => onDecrement(line.lineId)}
               onRemove={() => onRemove(line.lineId)}
               onSetQty={(qty) => onSetQty(line.lineId, qty)}
+              onSetPrice={allowPriceChange ? (price) => setPrice(line.lineId, price) : undefined}
+              priceEdited={line.priceOverride !== undefined}
             />
           ))
         )}

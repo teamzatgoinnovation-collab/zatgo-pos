@@ -33,6 +33,8 @@ type ZatGoDesktopApi = {
     deviceName?: string;
     silent?: boolean;
     landscape?: boolean;
+    /** Page size: 80mm roll (height follows the content) or A4. Default 80mm. */
+    paper?: "80mm" | "a4";
   }) => Promise<{ ok: true } | { ok: false; message: string }>;
   openCashDrawer: () => Promise<{ ok: true; stub: true }>;
   erpnextLogin: (input: {

@@ -30,7 +30,38 @@ export type SiteProfile = {
   taxInclusive: boolean;
   /** Changes when the company's tax template changes (set by newer cores; null otherwise). */
   taxVersion: string | null;
+  /** Seller details for the invoice (name, VAT, CR, contact, address); null from older cores. */
+  companyInfo: CompanyInfo | null;
 };
+
+export type CompanyInfo = {
+  name: string;
+  nameAr?: string;
+  vatNumber?: string;
+  crNumber?: string;
+  phone?: string;
+  email?: string;
+  website?: string;
+  address?: string;
+};
+
+function parseCompanyInfo(raw: unknown): CompanyInfo | null {
+  if (!raw || typeof raw !== "object") return null;
+  const d = raw as Record<string, unknown>;
+  const text = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : undefined);
+  const name = text(d.name);
+  if (!name) return null;
+  return {
+    name,
+    nameAr: text(d.name_ar),
+    vatNumber: text(d.vat_number),
+    crNumber: text(d.cr_number),
+    phone: text(d.phone),
+    email: text(d.email),
+    website: text(d.website),
+    address: text(d.address),
+  };
+}
 
 type SiteState = {
   profile: SiteProfile | null;
@@ -89,6 +120,7 @@ function parseProfile(d: Record<string, unknown>) {
     taxRate: Math.max(0, Number(d.tax_rate ?? 0)) / 100,
     taxInclusive: Number(d.tax_inclusive ?? 0) === 1,
     taxVersion: d.tax_version == null ? null : String(d.tax_version),
+    companyInfo: parseCompanyInfo(d.company_info),
   };
   return { profile, vertical, posMode };
 }

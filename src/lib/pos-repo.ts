@@ -251,6 +251,9 @@ function mapCustomer(row: Record<string, unknown>): CustomerRecord {
     name: String(row.name ?? row.customer_name ?? ""),
     phone: row.phone ? String(row.phone) : undefined,
     email: row.email ? String(row.email) : undefined,
+    address: row.address ? String(row.address) : undefined,
+    vatNumber: row.vat_number ? String(row.vat_number) : undefined,
+    crNumber: row.cr_number ? String(row.cr_number) : undefined,
   };
 }
 
@@ -1037,6 +1040,9 @@ export const posRepo = {
       customerPhone: meta.customerPhone ?? null,
       delivery: null,
       deliveryStatus: null,
+      // The invoice's stored ZATCA QR payloads (Phase 1 from the core; Phase 2 once the ZATCA Integration app stamped it).
+      zatcaQr: inv.zatcaQr ? String(inv.zatcaQr) : undefined,
+      zatcaQrP2: inv.zatcaQrP2 ? String(inv.zatcaQrP2) : undefined,
     };
     const payment = mapPayment({
       id: pay.id,
@@ -1044,7 +1050,8 @@ export const posRepo = {
       orderNumber: invoiceId,
       method: pay.method ?? method,
       amount: pay.amount ?? inv.total ?? pricing.amount,
-      paidAt: pay.paidAt ?? postedAt,
+      // The invoice's own date-time (the Payment Entry only has a date): the receipt and its ZATCA QR carry this moment.
+      paidAt: postedAt,
       channel: "counter",
     });
     // The posted figures are authoritative: the receipt must match the invoice and Payment Entry.

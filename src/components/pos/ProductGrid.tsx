@@ -2,6 +2,7 @@ import { cn } from "@zatgo/ui";
 import { motion } from "framer-motion";
 import type { ProductRecord } from "@/lib/pos-repo";
 import { money } from "@/lib/money";
+import { hueOf } from "@/lib/hue";
 
 export function ProductGrid({
   products,
@@ -53,14 +54,14 @@ export function ProductGrid({
             layout
             whileTap={{ scale: 0.97 }}
             onClick={() => onAdd(product)}
+            style={{ "--hue": hueOf(product.category || "General") } as React.CSSProperties}
             className={cn(
-              "relative flex min-h-[108px] flex-col rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-background)] p-3 text-left transition-colors",
-              "hover:border-[var(--color-primary)] hover:bg-[var(--color-muted)]",
-              qty > 0 && "border-[var(--pos-sidebar-active)] bg-[var(--pos-sidebar)]",
+              "pos-tile relative flex min-h-[108px] flex-col rounded-[var(--radius-lg)] border p-3 text-left transition-all",
+              qty > 0 && "ring-2 ring-[var(--color-primary)]",
             )}
           >
             {qty > 0 ? (
-              <span className="absolute right-2 top-2 flex size-6 items-center justify-center rounded-full bg-[var(--color-primary)] text-xs font-semibold tabular-nums text-[var(--color-primary-foreground)]">
+              <span className="pos-brand-bg absolute right-2 top-2 flex size-6 items-center justify-center rounded-full text-xs font-semibold tabular-nums text-[var(--color-primary-foreground)]">
                 {qty}
               </span>
             ) : null}
@@ -69,7 +70,7 @@ export function ProductGrid({
               {product.sku}
               {badges.length ? ` · ${badges.join(" · ")}` : ""}
             </p>
-            <p className="mt-auto pt-3 text-base font-semibold tabular-nums">
+            <p className="pos-tile-price mt-auto pt-3 text-base font-bold tabular-nums">
               {money(product.price)}
               {product.unit ? (
                 <span className="text-xs font-normal text-[var(--color-muted-foreground)]">

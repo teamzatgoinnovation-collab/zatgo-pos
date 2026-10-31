@@ -1,10 +1,10 @@
 @import "tailwindcss";
 @import "@zatgo/ui/globals.css";
-@source "../../../../packages/ui/src";
+@source "../../../packages/zatgo-packages/ui/src";
 
 :root {
-  --pos-sidebar: oklch(0.96 0.02 145);
-  --pos-sidebar-active: oklch(0.91 0.04 145);
+  --pos-sidebar: oklch(0.955 0.03 285);
+  --pos-sidebar-active: oklch(0.89 0.07 285);
   --app-sidebar: var(--pos-sidebar);
   --app-sidebar-active: var(--pos-sidebar-active);
   --pos-floor-free: oklch(0.94 0.03 145);
@@ -15,9 +15,46 @@
   --pos-kds-ready: oklch(0.93 0.06 145);
 }
 
+/* ZatGo POS palette: vivid indigo/violet brand, teal success, amber warning, coral danger; the shared package keeps its neutral tokens. */
+:root {
+  --color-primary: oklch(0.55 0.22 275);
+  --color-primary-foreground: oklch(0.99 0 0);
+  --color-ring: oklch(0.55 0.22 275);
+  --color-accent: oklch(0.93 0.05 290);
+  --color-accent-foreground: oklch(0.3 0.12 285);
+  --color-secondary: oklch(0.94 0.04 220);
+  --color-success: oklch(0.62 0.17 165);
+  --color-warning: oklch(0.8 0.17 80);
+  --color-destructive: oklch(0.62 0.23 18);
+  --color-background: oklch(0.975 0.015 285);
+  --color-card: oklch(1 0 0);
+  --color-border: oklch(0.9 0.025 285);
+  --pos-glow: radial-gradient(60rem 30rem at 85% -10%, oklch(0.9 0.09 300 / 0.55), transparent 60%),
+    radial-gradient(50rem 28rem at -10% 110%, oklch(0.92 0.08 200 / 0.5), transparent 60%);
+  --pos-brand-gradient: linear-gradient(135deg, oklch(0.58 0.23 268), oklch(0.6 0.24 315));
+}
+
 .dark {
-  --pos-sidebar: oklch(0.2 0.02 145);
-  --pos-sidebar-active: oklch(0.26 0.03 145);
+  --color-primary: oklch(0.72 0.17 285);
+  --color-primary-foreground: oklch(0.15 0.03 280);
+  --color-ring: oklch(0.72 0.17 285);
+  --color-accent: oklch(0.3 0.08 290);
+  --color-accent-foreground: oklch(0.95 0.02 290);
+  --color-secondary: oklch(0.28 0.05 230);
+  --color-success: oklch(0.74 0.16 165);
+  --color-warning: oklch(0.82 0.15 80);
+  --color-destructive: oklch(0.7 0.19 20);
+  --color-background: oklch(0.17 0.03 280);
+  --color-card: oklch(0.22 0.035 282);
+  --color-border: oklch(0.31 0.04 282);
+  --pos-glow: radial-gradient(60rem 30rem at 85% -10%, oklch(0.4 0.17 300 / 0.45), transparent 60%),
+    radial-gradient(50rem 28rem at -10% 110%, oklch(0.4 0.12 215 / 0.4), transparent 60%);
+  --pos-brand-gradient: linear-gradient(135deg, oklch(0.62 0.21 268), oklch(0.62 0.23 318));
+}
+
+.dark {
+  --pos-sidebar: oklch(0.2 0.04 282);
+  --pos-sidebar-active: oklch(0.3 0.09 285);
   --app-sidebar: var(--pos-sidebar);
   --app-sidebar-active: var(--pos-sidebar-active);
   --pos-floor-free: oklch(0.28 0.03 145);
@@ -32,6 +69,60 @@ body {
   font-family: var(--font-sans);
 }
 
+body {
+  background-image: var(--pos-glow);
+  background-attachment: fixed;
+}
+
 #root {
   min-height: 100vh;
+}
+
+/* Category colour: a tile or chip sets --hue (0-359) and gets a tinted surface, a coloured edge and a matching price. */
+.pos-tile {
+  --tint: oklch(0.95 0.045 var(--hue));
+  --edge: oklch(0.62 0.17 var(--hue));
+  background: linear-gradient(160deg, var(--tint), var(--color-card) 70%);
+  border-color: color-mix(in oklch, var(--edge) 35%, var(--color-border));
+  border-top: 4px solid var(--edge);
+  box-shadow: 0 1px 2px color-mix(in oklch, var(--edge) 18%, transparent);
+}
+.dark .pos-tile {
+  --tint: oklch(0.3 0.07 var(--hue));
+  --edge: oklch(0.72 0.15 var(--hue));
+}
+.pos-tile:hover {
+  box-shadow: 0 6px 18px color-mix(in oklch, var(--edge) 30%, transparent);
+  transform: translateY(-1px);
+}
+.pos-tile-price {
+  color: color-mix(in oklch, var(--edge) 80%, var(--color-foreground));
+}
+.pos-chip-dot {
+  background: oklch(0.68 0.17 var(--hue));
+}
+.pos-brand-bg {
+  background-image: var(--pos-brand-gradient);
+  color: oklch(0.99 0 0);
+}
+
+.pos-pay:hover:not(:disabled) {
+  background: oklch(0.95 0.045 var(--hue));
+}
+.dark .pos-pay:hover:not(:disabled) {
+  background: oklch(0.3 0.08 var(--hue));
+}
+.pos-pay-on {
+  background: oklch(0.6 0.17 var(--hue));
+  color: oklch(0.99 0 0);
+}
+
+/* Every primary button of the shared UI gets the brand gradient (the shared package keeps its flat token). */
+button[class*="bg-[var(--color-primary)]"] {
+  background-image: var(--pos-brand-gradient);
+  color: oklch(0.99 0 0);
+  box-shadow: 0 4px 14px color-mix(in oklch, var(--color-primary) 35%, transparent);
+}
+button[class*="bg-[var(--color-primary)]"]:disabled {
+  box-shadow: none;
 }

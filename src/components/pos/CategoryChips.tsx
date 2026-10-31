@@ -1,4 +1,5 @@
 import { cn } from "@zatgo/ui";
+import { hueOf } from "@/lib/hue";
 
 export function CategoryChips({
   categories,
@@ -16,13 +17,15 @@ export function CategoryChips({
           key={c}
           type="button"
           onClick={() => onChange(c)}
+          style={{ "--hue": hueOf(c) } as React.CSSProperties}
           className={cn(
-            "shrink-0 rounded-[var(--radius-lg)] px-3.5 py-2 text-xs capitalize transition-colors",
+            "flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-2 text-xs capitalize transition-colors",
             value === c
-              ? "bg-[var(--pos-sidebar-active)] font-semibold text-[var(--color-foreground)]"
+              ? "pos-brand-bg font-semibold shadow-sm"
               : "bg-[var(--color-muted)] text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]",
           )}
         >
+          {c === "all" ? null : <span className="pos-chip-dot size-2 rounded-full" />}
           {c === "all" ? "All" : c}
         </button>
       ))}

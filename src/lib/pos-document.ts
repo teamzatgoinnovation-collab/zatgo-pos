@@ -1,5 +1,5 @@
 import type { OrderRecord, PaymentRecord } from "@/lib/pos-repo";
-import type { CustomerRecord } from "@/lib/pos-models";
+import { findKnownCustomer } from "@/lib/customer-search";
 import { extrasSummary } from "@/lib/extras";
 import type { VerticalProfile } from "@/lib/verticals";
 import { renderInvoiceHtml, type Paper } from "@/lib/invoice-html";
@@ -75,9 +75,7 @@ function sellerInfo(): PartyInfo | undefined {
 }
 
 function buyerInfo(order: OrderRecord): PartyInfo | undefined {
-  const known = order.customerId
-    ? queryClient.getQueryData<CustomerRecord[]>(["pos", "customers"])?.find((c) => c.id === order.customerId)
-    : undefined;
+  const known = findKnownCustomer(queryClient, order.customerId);
   if (known) {
     return {
       name: known.name,

@@ -11,6 +11,8 @@ import {
 } from "@/store/cart";
 import { money } from "@/lib/money";
 import { useConnectivity } from "@/lib/offline/connectivity";
+import { rememberCustomers } from "@/lib/customer-search";
+import { CustomerPicker } from "./CustomerPicker";
 
 const inputClass =
   "mt-1 h-9 w-full rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-transparent px-3 text-sm outline-none focus:border-[var(--color-primary)]";
@@ -18,7 +20,6 @@ const inputClass =
 export function InvoiceCheckoutDialog({
   open,
   invoice,
-  customers,
   tables,
   showTable,
   showDelivery = true,
@@ -30,7 +31,6 @@ export function InvoiceCheckoutDialog({
 }: {
   open: boolean;
   invoice: CartInvoiceMeta;
-  customers: CustomerRecord[];
   tables: TableRecord[];
   showTable: boolean;
   showDelivery?: boolean;
@@ -132,8 +132,8 @@ export function InvoiceCheckoutDialog({
     onChange({ ...invoice, ...partial });
   };
 
-  const onPickCustomer = (id: string) => {
-    if (!id) {
+  const onPickCustomer = (customer: CustomerRecord | null) => {
+    if (!customer) {
       patch({
         customerId: null,
         customerName: "",
@@ -141,8 +141,8 @@ export function InvoiceCheckoutDialog({
       });
       return;
     }
-    const customer = customers.find((c) => c.id === id);
-    if (!customer) return;
+    // The invoice prints this customer's VAT / CR / address from the saved record, so keep it (a customer found by search is not in the warm list).
+    rememberCustomers(qc, [customer]);
     patch({
       customerId: customer.id,
       customerName: customer.name,
@@ -181,6 +181,7 @@ export function InvoiceCheckoutDialog({
   const createCustomer = useMutation({
     mutationFn: (input: { name: string; phone?: string }) => posRepo.upsertCustomer(input),
     onSuccess: (customer) => {
+      rememberCustomers(qc, [customer]);
       void qc.invalidateQueries({ queryKey: ["pos", "customers"] });
       patch({ customerId: customer.id, customerName: customer.name, customerPhone: customer.phone ?? "" });
       toast.success(`Customer ${customer.name} saved`);
@@ -279,22 +280,17 @@ export function InvoiceCheckoutDialog({
           </p>
         ) : null}
         <div className="grid gap-3 sm:grid-cols-2">
-          <label className="block text-sm sm:col-span-2">
+          <div className="block text-sm sm:col-span-2">
             <span className="font-medium">Customer</span>
-            <select
-              className={inputClass}
-              value={invoice.customerId ?? ""}
-              onChange={(e) => onPickCustomer(e.target.value)}
-            >
-              <option value="">{offline ? "Walk-in" : "Walk-in / custom"}</option>
-              {customers.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                  {c.phone ? ` · ${c.phone}` : ""}
-                </option>
-              ))}
-            </select>
-          </label>
+            <CustomerPicker
+              selectedId={invoice.customerId}
+              selectedName={invoice.customerName}
+              selectedPhone={invoice.customerPhone}
+              offline={offline}
+              triggerClassName={inputClass}
+              onPick={onPickCustomer}
+            />
+          </div>
           <label className="block text-sm">
             <span className="font-medium">Name</span>
             <input

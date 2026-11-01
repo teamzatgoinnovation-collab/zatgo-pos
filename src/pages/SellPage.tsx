@@ -57,6 +57,7 @@ import { usePrinterStore } from "@/store/printer";
 import { money } from "@/lib/money";
 import { discountViolation } from "@/lib/offline/limits";
 import { useConnectivity } from "@/lib/offline/connectivity";
+import { CUSTOMERS_KEY } from "@/lib/customer-search";
 import { usePosSettings } from "@/lib/offline/settings";
 
 export function SellPage() {
@@ -166,8 +167,9 @@ export function SellPage() {
     enabled: showFloor,
   });
 
-  const { data: customers = [] } = useQuery({
-    queryKey: ["pos", "customers"],
+  // Kept warm so the customer picker opens at once; the picker searches the full list itself.
+  useQuery({
+    queryKey: CUSTOMERS_KEY,
     queryFn: () => posRepo.listCustomers(),
   });
 
@@ -542,7 +544,6 @@ export function SellPage() {
       <InvoiceCheckoutDialog
         open={invoiceOpen}
         invoice={invoice}
-        customers={customers}
         tables={tables}
         showTable={showFloor}
         showDelivery={showDelivery}

@@ -30,6 +30,7 @@ import { useConnectivity } from "@/lib/offline/connectivity";
 import { useOutbox } from "@/lib/offline/outbox";
 import { recordView } from "@/lib/offline/sale-view";
 import { getCatalogRows, getCustomerRows } from "@/lib/offline/snapshot";
+import { matchCustomers } from "@/lib/customer-search";
 import { kickSync } from "@/lib/offline/sync-worker";
 import { OfflineBlockedError, discardStaged, promoteToOffline, stageSale } from "@/lib/offline/stage-sale";
 import { offlineBridge } from "@/lib/offline/bridge";
@@ -571,12 +572,7 @@ export const posRepo = {
       async () => {
         const rows = await getCustomerRows();
         if (!rows) return null;
-        const q = search?.trim().toLowerCase();
-        const all = rows.map(mapCustomer).filter((c) => c.id);
-        const hit = q
-          ? all.filter((c) => `${c.name} ${c.phone ?? ""} ${c.id}`.toLowerCase().includes(q))
-          : all;
-        return hit.slice(0, 100);
+        return matchCustomers(rows.map(mapCustomer).filter((c) => c.id), search ?? "");
       },
     );
   },

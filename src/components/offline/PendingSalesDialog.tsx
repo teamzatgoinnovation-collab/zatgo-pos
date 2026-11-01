@@ -4,12 +4,14 @@ import { buildSaleDocument } from "@/lib/pos-document";
 import { printPosDocument } from "@/lib/print";
 import { money } from "@/lib/money";
 import { useBusinessStore } from "@/store/business";
-import { markRetryNow } from "@/lib/offline/outbox-state";
+import { markRetryNow, pendingCount } from "@/lib/offline/outbox-state";
 import { useOutbox } from "@/lib/offline/outbox";
 import { recordView } from "@/lib/offline/sale-view";
 import { hoursLeft } from "@/lib/offline/limits";
 import { usePosSettings } from "@/lib/offline/settings";
-import { kickSync } from "@/lib/offline/sync-worker";
+import { useConnectivity } from "@/lib/offline/connectivity";
+import { syncNote } from "@/lib/offline/sync-note";
+import { kickSync, useSyncStatus } from "@/lib/offline/sync-worker";
 import type { OutboxRecord, OutboxState } from "@/lib/offline/types";
 
 const STATE_LABEL: Record<OutboxState, string> = {
@@ -32,6 +34,9 @@ export function PendingSalesDialog({ open, onClose }: { open: boolean; onClose: 
   const records = useOutbox((s) => s.records);
   const profile = useBusinessStore((s) => s.profile);
   const settings = usePosSettings((s) => s.settings.offline);
+  const net = useConnectivity((s) => s.net);
+  const sync = useSyncStatus();
+  const note = syncNote({ net, status: sync.status, message: sync.message, waiting: pendingCount(records) });
   const shown = [...records].filter((r) => r.offlineRef).sort((a, b) => b.seq - a.seq);
 
   const reprint = async (rec: OutboxRecord) => {
@@ -80,6 +85,20 @@ export function PendingSalesDialog({ open, onClose }: { open: boolean; onClose: 
         </>
       }
     >
+      {note ? (
+        <p
+          role="status"
+          className={`mb-3 rounded-[var(--radius-lg)] border px-3 py-2 text-xs ${
+            note.tone === "error"
+              ? "border-red-300 bg-red-50 text-red-900"
+              : note.tone === "info"
+                ? "border-blue-200 bg-blue-50 text-blue-900"
+                : "border-amber-300 bg-amber-50 text-amber-900"
+          }`}
+        >
+          {note.text}
+        </p>
+      ) : null}
       {shown.length === 0 ? (
         <p className="text-sm text-[var(--color-muted-foreground)]">No offline sales on this device.</p>
       ) : (

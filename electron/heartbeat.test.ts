@@ -58,3 +58,52 @@ test("a transport failure on an authenticated call flips to offline immediately"
   assert.equal(hb.state(), "offline");
   assert.equal(events.at(-1), "offline");
 });
+
+test("a probe that needs no network call (no site yet) does not wedge the probes after it", async () => {
+  const { hb, env, urls, events } = make({ base: null });
+  assert.equal(await hb.check(), "offline");
+  env.base = "https://s";
+  assert.equal(await hb.check(), "online");
+  assert.equal(urls.length, 1);
+  assert.deepEqual(events, ["offline", "online"]);
+});
+
+test("recovers by itself once the OS reports the network back", async () => {
+  const { hb, env } = make({ net: false });
+  assert.equal(await hb.check(), "offline");
+  env.net = true;
+  assert.equal(await hb.check(), "online");
+  env.net = false;
+  assert.equal(await hb.check(), "offline");
+  env.net = true;
+  assert.equal(await hb.check(), "online");
+});
+
+test("probes started together share one request; the next one after they finish probes again", async () => {
+  const { hb, urls } = make();
+  const [a, b] = await Promise.all([hb.check(), hb.check()]);
+  assert.equal(a, "online");
+  assert.equal(b, "online");
+  assert.equal(urls.length, 1);
+  await hb.check();
+  assert.equal(urls.length, 2);
+});
+
+test("an emit that throws (window gone) neither wedges nor loses the change: the next probe announces it", async () => {
+  let boom = true;
+  const events: ConnectivityState[] = [];
+  const hb = new Heartbeat({
+    getBaseUrl: () => "https://s",
+    isNetOnline: () => true,
+    fetchFn: async () => ({ ok: true, status: 200 }),
+    emit: (s) => {
+      if (boom) throw new Error("Object has been destroyed");
+      events.push(s);
+    },
+  });
+  assert.equal(await hb.check(), "online");
+  assert.deepEqual(events, []);
+  boom = false;
+  assert.equal(await hb.check(), "online");
+  assert.deepEqual(events, ["online"]);
+});

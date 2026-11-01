@@ -81,20 +81,32 @@ export async function runSync(opts: { manual?: boolean } = {}): Promise<void> {
   running = true;
   let synced = 0;
   let parked = 0;
+  // Why nothing was sent, said out loud when the cashier pressed "Sync now" (the timer stays quiet).
+  const stop = (status: SyncStatus, message: string | null) => {
+    setStatus(status, message);
+    if (opts.manual && message) toast.info(message);
+  };
   try {
     for (;;) {
-      const net = useConnectivity.getState().net;
-      if (net === "offline") return setStatus("offline");
+      let net = useConnectivity.getState().net;
+      if (net === "offline") {
+        // The heartbeat can be a few seconds behind: ask for a fresh probe before giving up.
+        await useConnectivity.getState().checkNow();
+        net = useConnectivity.getState().net;
+      }
+      if (net === "offline") {
+        return stop("offline", "The site cannot be reached yet. Sales stay saved on this device and sync by themselves once it can.");
+      }
       const session = useSessionStore.getState();
       const waiting = useOutbox.getState().records.filter((r) => r.state !== "synced");
       if (net === "auth-expired" || !session.connected || !session.user) {
         const who = waiting[0]?.user;
-        return setStatus("paused-auth", who ? `Sign in as ${who} to sync` : "Sign in to sync");
+        return stop("paused-auth", who ? `Sign in as ${who} to sync` : "Sign in to sync");
       }
       const site = normalizeSite(session.connection.baseUrl);
       const mine = waiting.filter((r) => r.user.toLowerCase() === session.user!.toLowerCase() && normalizeSite(r.site) === site);
       if (mine.length === 0) {
-        return setStatus("wrong-user", `Waiting sales belong to ${waiting[0]?.user ?? "another cashier"}; they sync when that cashier signs in`);
+        return stop("wrong-user", `Waiting sales belong to ${waiting[0]?.user ?? "another cashier"}; they sync when that cashier signs in`);
       }
       if (opts.manual) {
         for (const r of mine) if (r.state === "retry_wait") await useOutbox.getState().put(markRetryNow(r));
@@ -117,7 +129,7 @@ export async function runSync(opts: { manual?: boolean } = {}): Promise<void> {
         if (kind === "transient") {
           await useOutbox.getState().put(markRetry(sending, message, Date.now()));
           if (info.network) useConnectivity.getState().markNetworkFailure();
-          return setStatus("idle", `Retrying: ${message}`);
+          return stop("idle", `Retrying: ${message}`);
         }
         if (kind === "auth") {
           // A 403 from a still-valid login is a permission problem for this sale, not a lost session.
@@ -128,11 +140,11 @@ export async function runSync(opts: { manual?: boolean } = {}): Promise<void> {
             continue;
           }
           await useOutbox.getState().put(markPaused(sending, "Sign in again to sync"));
-          return setStatus("paused-auth", `Sign in as ${sending.user} to sync`);
+          return stop("paused-auth", `Sign in as ${sending.user} to sync`);
         }
         if (kind === "switched-off") {
           await useOutbox.getState().put(markPaused(sending, message));
-          return setStatus("paused-off", "The POS is switched off on the site — sales stay saved here until it is back on");
+          return stop("paused-off", "The POS is switched off on the site — sales stay saved here until it is back on");
         }
         await useOutbox.getState().put(markNeedsAttention(sending, message));
         parked++;

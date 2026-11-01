@@ -85,6 +85,12 @@ export function CartLineItem({
         ) : null}
       </p>
 
+      {!(editable && onSetPrice) ? (
+        <span className="shrink-0 text-xs tabular-nums text-[var(--color-muted-foreground)]" title="Unit price">
+          {line.unitPrice.toFixed(2)}
+        </span>
+      ) : null}
+
       {editable && onSetPrice ? (
         <input
           inputMode="decimal"
